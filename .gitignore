@@ -1,0 +1,26 @@
+# Build outputs
+dist/
+*.whl
+*.egg-info/
+
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.venv/
+venv/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
