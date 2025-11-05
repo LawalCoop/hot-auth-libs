@@ -893,8 +893,12 @@ export class HankoAuth extends LitElement {
     if (selectedValue === 'profile') {
       window.location.href = '/profile';
     } else if (selectedValue === 'connect-osm') {
-      const currentUrl = window.location.href;
-      window.location.href = `${this.hankoUrl}/login?return_to=${encodeURIComponent(currentUrl)}&osm_required=true`;
+      // Smart return_to: if already on a login page, redirect to home instead
+      const currentPath = window.location.pathname;
+      const isOnLoginPage = currentPath.includes('/login');
+      const returnTo = isOnLoginPage ? window.location.origin : window.location.href;
+
+      window.location.href = `${this.hankoUrl}/login?return_to=${encodeURIComponent(returnTo)}&osm_required=true`;
     } else if (selectedValue === 'logout') {
       this.handleLogout();
     }
@@ -1037,10 +1041,14 @@ export class HankoAuth extends LitElement {
         `;
       } else {
         // In header - show login link
-        const currentUrl = window.location.href;
+        // Smart return_to: if already on a login page, redirect to home instead
+        const currentPath = window.location.pathname;
+        const isOnLoginPage = currentPath.includes('/login');
+        const returnTo = isOnLoginPage ? window.location.origin : window.location.href;
+
         const urlParams = new URLSearchParams(window.location.search);
         const autoConnectParam = urlParams.get('auto_connect') === 'true' ? '&auto_connect=true' : '';
-        const loginUrl = `${this.hankoUrl}/login?return_to=${encodeURIComponent(currentUrl)}${this.osmRequired ? '&osm_required=true' : ''}${autoConnectParam}`;
+        const loginUrl = `${this.hankoUrl}/login?return_to=${encodeURIComponent(returnTo)}${this.osmRequired ? '&osm_required=true' : ''}${autoConnectParam}`;
 
         return html`
           <div class="container">
