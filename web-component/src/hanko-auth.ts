@@ -501,41 +501,76 @@ export class HankoAuth extends LitElement {
     }
 
     try {
-      this.log('📡 Checking session validity...');
+      this.log('📡 Checking session validity via cookie...');
 
+      // First, try to validate the session cookie directly
+      // This works across subdomains because the cookie has domain: .hotosm.test
       try {
-        const user = await this._hanko.user.getCurrent();
-        this.log('✅ Valid Hanko session found');
-        this.log('👤 Existing user session:', user);
+        const validateResponse = await fetch(`${this.hankoUrl}/sessions/validate`, {
+          method: 'GET',
+          credentials: 'include', // Include httpOnly cookies
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        });
 
-        this.user = {
-          id: user.id,
-          email: user.email,
-          username: user.username,
-          emailVerified: user.email_verified || false
-        };
+        if (validateResponse.ok) {
+          const sessionData = await validateResponse.json();
+          this.log('✅ Valid Hanko session found via cookie');
+          this.log('📋 Session data:', sessionData);
 
-        this.dispatchEvent(new CustomEvent('hanko-login', {
-          detail: { user: this.user },
-          bubbles: true,
-          composed: true
-        }));
+          // Now get the full user data using the SDK
+          // The SDK should now work because the session is validated
+          try {
+            const user = await this._hanko.user.getCurrent();
+            this.log('👤 User data retrieved:', user);
 
-        this.dispatchEvent(new CustomEvent('auth-complete', {
-          bubbles: true,
-          composed: true
-        }));
+            this.user = {
+              id: user.id,
+              email: user.email,
+              username: user.username,
+              emailVerified: user.email_verified || false
+            };
+          } catch (userError) {
+            // If SDK fails, use session data directly
+            this.log('⚠️ SDK failed, using session data directly:', userError);
+            if (sessionData.user_id) {
+              this.user = {
+                id: sessionData.user_id,
+                email: sessionData.email || null,
+                username: null,
+                emailVerified: false
+              };
+            }
+          }
 
-        await this.syncJWTToCookie();
+          if (this.user) {
+            this.dispatchEvent(new CustomEvent('hanko-login', {
+              detail: { user: this.user },
+              bubbles: true,
+              composed: true
+            }));
 
-        // Also check if we need to auto-connect to OSM
-        await this.checkOSMConnection();
-        if (this.osmRequired && this.autoConnect && !this.osmConnected) {
-          console.log('🔄 Auto-connecting to OSM (from existing session)...');
-          this.handleOSMConnect();
+            this.dispatchEvent(new CustomEvent('auth-complete', {
+              bubbles: true,
+              composed: true
+            }));
+
+            await this.syncJWTToCookie();
+
+            // Also check if we need to auto-connect to OSM
+            await this.checkOSMConnection();
+            if (this.osmRequired && this.autoConnect && !this.osmConnected) {
+              console.log('🔄 Auto-connecting to OSM (from existing session)...');
+              this.handleOSMConnect();
+            }
+          }
+        } else {
+          this.log('ℹ️ No valid session cookie found - user needs to login');
         }
-      } catch (userError) {
-        this.log('ℹ️ No valid Hanko session found - user needs to login');
+      } catch (validateError) {
+        this.log('⚠️ Session validation failed:', validateError);
+        this.log('ℹ️ No valid session - user needs to login');
       }
     } catch (error) {
       this.log('⚠️ Session check error:', error);
