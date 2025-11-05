@@ -503,7 +503,7 @@ export class HankoAuth extends LitElement {
     try {
       this.log('📡 Checking session validity via cookie...');
 
-      // First, try to validate the session cookie directly
+      // First, try to validate the session cookie directly with Hanko
       // This works across subdomains because the cookie has domain: .hotosm.test
       try {
         const validateResponse = await fetch(`${this.hankoUrl}/sessions/validate`, {
@@ -519,21 +519,41 @@ export class HankoAuth extends LitElement {
           this.log('✅ Valid Hanko session found via cookie');
           this.log('📋 Session data:', sessionData);
 
-          // Now get the full user data using the SDK
-          // The SDK should now work because the session is validated
+          // Now get the full user data from the login backend /me endpoint
+          // This endpoint validates the JWT and returns complete user info
           try {
-            const user = await this._hanko.user.getCurrent();
-            this.log('👤 User data retrieved:', user);
+            const meResponse = await fetch(`${this.hankoUrl}/me`, {
+              method: 'GET',
+              credentials: 'include', // Include httpOnly cookies
+              headers: {
+                'Content-Type': 'application/json',
+              },
+            });
 
-            this.user = {
-              id: user.id,
-              email: user.email,
-              username: user.username,
-              emailVerified: user.email_verified || false
-            };
+            if (meResponse.ok) {
+              const userData = await meResponse.json();
+              this.log('👤 User data retrieved from /me:', userData);
+
+              this.user = {
+                id: userData.user_id,
+                email: userData.email || null,
+                username: userData.username || null,
+                emailVerified: false
+              };
+            } else {
+              this.log('⚠️ /me endpoint failed, trying SDK fallback');
+              // Fallback to SDK method
+              const user = await this._hanko.user.getCurrent();
+              this.user = {
+                id: user.id,
+                email: user.email,
+                username: user.username,
+                emailVerified: user.email_verified || false
+              };
+            }
           } catch (userError) {
-            // If SDK fails, use session data directly
-            this.log('⚠️ SDK failed, using session data directly:', userError);
+            this.log('⚠️ Failed to get user data:', userError);
+            // Last resort: use session data if available
             if (sessionData.user_id) {
               this.user = {
                 id: sessionData.user_id,
