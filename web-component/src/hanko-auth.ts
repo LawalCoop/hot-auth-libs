@@ -894,7 +894,7 @@ export class HankoAuth extends LitElement {
       window.location.href = '/profile';
     } else if (selectedValue === 'connect-osm') {
       const currentUrl = window.location.href;
-      window.location.href = `/login?return_to=${encodeURIComponent(currentUrl)}&osm_required=true`;
+      window.location.href = `${this.hankoUrl}/login?return_to=${encodeURIComponent(currentUrl)}&osm_required=true`;
     } else if (selectedValue === 'logout') {
       this.handleLogout();
     }
@@ -1040,7 +1040,7 @@ export class HankoAuth extends LitElement {
         const currentUrl = window.location.href;
         const urlParams = new URLSearchParams(window.location.search);
         const autoConnectParam = urlParams.get('auto_connect') === 'true' ? '&auto_connect=true' : '';
-        const loginUrl = `/login?return_to=${encodeURIComponent(currentUrl)}${this.osmRequired ? '&osm_required=true' : ''}${autoConnectParam}`;
+        const loginUrl = `${this.hankoUrl}/login?return_to=${encodeURIComponent(currentUrl)}${this.osmRequired ? '&osm_required=true' : ''}${autoConnectParam}`;
 
         return html`
           <div class="container">
