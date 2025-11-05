@@ -953,7 +953,8 @@ export class HankoAuth extends LitElement {
       const isOnLoginPage = currentPath.includes('/login');
       const returnTo = isOnLoginPage ? window.location.origin : window.location.href;
 
-      window.location.href = `${this.hankoUrl}/login?return_to=${encodeURIComponent(returnTo)}&osm_required=true`;
+      const baseUrl = this.hankoUrl || (window as any).HANKO_URL || window.location.origin;
+      window.location.href = `${baseUrl}/login?return_to=${encodeURIComponent(returnTo)}&osm_required=true`;
     } else if (selectedValue === 'logout') {
       this.handleLogout();
     }
@@ -1103,7 +1104,10 @@ export class HankoAuth extends LitElement {
 
         const urlParams = new URLSearchParams(window.location.search);
         const autoConnectParam = urlParams.get('auto_connect') === 'true' ? '&auto_connect=true' : '';
-        const loginUrl = `${this.hankoUrl}/login?return_to=${encodeURIComponent(returnTo)}${this.osmRequired ? '&osm_required=true' : ''}${autoConnectParam}`;
+
+        // Ensure we have a valid hanko URL with fallback chain
+        const baseUrl = this.hankoUrl || (window as any).HANKO_URL || window.location.origin;
+        const loginUrl = `${baseUrl}/login?return_to=${encodeURIComponent(returnTo)}${this.osmRequired ? '&osm_required=true' : ''}${autoConnectParam}`;
 
         return html`
           <div class="container">
