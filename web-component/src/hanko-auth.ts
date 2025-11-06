@@ -6,6 +6,7 @@
  * - Optional OSM connection
  * - Session management
  * - Event dispatching
+ * - URL fallback chain for production builds
  */
 
 import { LitElement, html, css } from 'lit';
