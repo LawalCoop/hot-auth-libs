@@ -7,7 +7,7 @@ Routes:
     GET  /auth/osm/login - Start OSM OAuth flow
     GET  /auth/osm/callback - Handle OSM OAuth callback
     GET  /auth/osm/status - Check OSM connection status
-    POST /auth/osm/disconnect - Disconnect OSM account
+    POST /auth/osm/disconnect - Revoke OAuth tokens and disconnect OSM account
 """
 
 import secrets
@@ -202,14 +202,15 @@ async def osm_status(
 @router.post("/disconnect")
 async def osm_disconnect(
     response: Response,
+    osm: Optional[OSMConnection] = Depends(get_osm_connection),
 ):
     """
     Disconnect OSM account.
 
-    Removes OSM connection cookie.
+    Revokes OAuth tokens on OpenStreetMap and removes OSM connection cookie.
     User can reconnect later via /auth/osm/login.
 
-    Note: This endpoint does NOT require authentication because it's called
+    Note: This endpoint does NOT require Hanko authentication because it's called
     during logout when the JWT may have already been cleared.
 
     Usage:
@@ -223,9 +224,34 @@ async def osm_disconnect(
         }
 
     Returns:
-        {"status": "disconnected"}
+        {"status": "disconnected", "tokens_revoked": boolean}
     """
     config = get_config()
+    tokens_revoked = False
+
+    # Revoke tokens on OSM if we have a connection
+    if osm and config.osm_enabled:
+        try:
+            osm_client = OSMOAuthClient(config)
+
+            # Revoke access token
+            if osm.access_token:
+                logger.info(f"Revoking OSM access token for user {osm.osm_username}")
+                await osm_client.revoke_token(osm.access_token, "access_token")
+
+            # Revoke refresh token
+            if osm.refresh_token:
+                logger.info(f"Revoking OSM refresh token for user {osm.osm_username}")
+                await osm_client.revoke_token(osm.refresh_token, "refresh_token")
+
+            tokens_revoked = True
+            logger.info(f"Successfully revoked OSM tokens for {osm.osm_username}")
+
+        except Exception as e:
+            # Log error but don't fail - we'll still clear the cookie
+            logger.error(f"Failed to revoke OSM tokens: {e}")
+
+    # Clear the cookie regardless of revocation result
     clear_osm_cookie(response, config)
 
-    return {"status": "disconnected"}
+    return {"status": "disconnected", "tokens_revoked": tokens_revoked}

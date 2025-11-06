@@ -6,6 +6,7 @@ Handles the OAuth flow for connecting OSM accounts:
 2. Exchange code for tokens
 3. Fetch user profile
 4. Refresh tokens
+5. Revoke tokens
 """
 
 from typing import Optional
@@ -58,6 +59,7 @@ class OSMOAuthClient:
         # OAuth endpoints
         self.authorize_url = f"{self.osm_api_url}/oauth2/authorize"
         self.token_url = f"{self.osm_api_url}/oauth2/token"
+        self.revoke_url = f"{self.osm_api_url}/oauth2/revoke"
         self.user_details_url = f"{self.osm_api_url}/api/0.6/user/details.json"
 
     def get_authorization_url(
@@ -220,6 +222,58 @@ class OSMOAuthClient:
                 ) from e
             except httpx.RequestError as e:
                 raise OSMOAuthError(f"Token refresh request failed: {str(e)}") from e
+
+    async def revoke_token(self, token: str, token_type_hint: str = "access_token"):
+        """Revoke an OAuth token.
+
+        Revokes the specified token on OpenStreetMap's authorization server.
+        This is part of the OAuth 2.0 Token Revocation spec (RFC 7009).
+
+        Args:
+            token: The token to revoke (access_token or refresh_token)
+            token_type_hint: Type of token - "access_token" or "refresh_token"
+
+        Returns:
+            None: Revocation is successful (or token was already invalid)
+
+        Raises:
+            OSMOAuthError: If revocation request fails
+
+        Example:
+            # Revoke access token
+            await client.revoke_token(osm_conn.access_token, "access_token")
+
+            # Revoke refresh token
+            if osm_conn.refresh_token:
+                await client.revoke_token(osm_conn.refresh_token, "refresh_token")
+        """
+        async with httpx.AsyncClient() as client:
+            try:
+                response = await client.post(
+                    self.revoke_url,
+                    data={
+                        "token": token,
+                        "token_type_hint": token_type_hint,
+                        "client_id": self.client_id,
+                        "client_secret": self.client_secret,
+                    },
+                    headers={"Accept": "application/json"},
+                )
+
+                # Per RFC 7009: The server responds with HTTP 200 if successful
+                # or if the token was already invalid/expired
+                response.raise_for_status()
+
+            except httpx.HTTPStatusError as e:
+                # Don't raise error for 403 - it means token was already invalid
+                if e.response.status_code == 403:
+                    # Token already revoked or invalid - this is fine
+                    return
+                raise OSMOAuthError(
+                    f"Token revocation failed: {e.response.status_code} {e.response.text}"
+                ) from e
+            except httpx.RequestError as e:
+                raise OSMOAuthError(f"Token revocation request failed: {str(e)}") from e
 
     async def _get_user_details(self, access_token: str) -> dict:
         """Fetch user profile from OSM API.
