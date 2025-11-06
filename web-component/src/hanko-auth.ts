@@ -1108,6 +1108,7 @@ export class HankoAuth extends LitElement {
 
         // Build URL with proper fallback chain (don't use getter as it has its own fallbacks)
         const baseUrl = this.hankoUrlAttr || (window as any).HANKO_URL || window.location.origin;
+        console.log('🔗 Login URL base:', baseUrl);
         const loginUrl = `${baseUrl}/login?return_to=${encodeURIComponent(returnTo)}${this.osmRequired ? '&osm_required=true' : ''}${autoConnectParam}`;
 
         return html`
