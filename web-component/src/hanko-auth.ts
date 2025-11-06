@@ -954,7 +954,8 @@ export class HankoAuth extends LitElement {
       const isOnLoginPage = currentPath.includes('/login');
       const returnTo = isOnLoginPage ? window.location.origin : window.location.href;
 
-      const baseUrl = this.hankoUrlAttr || (window as any).HANKO_URL || window.location.origin;
+      // Use the getter which handles all fallbacks correctly
+      const baseUrl = this.hankoUrl;
       window.location.href = `${baseUrl}/login?return_to=${encodeURIComponent(returnTo)}&osm_required=true`;
     } else if (selectedValue === 'logout') {
       this.handleLogout();
@@ -1106,8 +1107,8 @@ export class HankoAuth extends LitElement {
         const urlParams = new URLSearchParams(window.location.search);
         const autoConnectParam = urlParams.get('auto_connect') === 'true' ? '&auto_connect=true' : '';
 
-        // Build URL with proper fallback chain (don't use getter as it has its own fallbacks)
-        const baseUrl = this.hankoUrlAttr || (window as any).HANKO_URL || window.location.origin;
+        // Use the getter which handles all fallbacks correctly
+        const baseUrl = this.hankoUrl;
         console.log('🔗 Login URL base:', baseUrl);
         const loginUrl = `${baseUrl}/login?return_to=${encodeURIComponent(returnTo)}${this.osmRequired ? '&osm_required=true' : ''}${autoConnectParam}`;
 
