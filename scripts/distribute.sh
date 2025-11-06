@@ -10,11 +10,15 @@ AUTH_LIBS_DIR="$(dirname "$SCRIPT_DIR")"
 HOT_DIR="$(dirname "$AUTH_LIBS_DIR")"
 
 # Distribute web component
-echo "📦 Distributing web-component dist/ to portal..."
+echo "📦 Distributing web-component (source + dist) to portal..."
 mkdir -p "$HOT_DIR/portal/frontend/auth-libs/web-component"
 rm -rf "$HOT_DIR/portal/frontend/auth-libs/web-component/dist"
+rm -rf "$HOT_DIR/portal/frontend/auth-libs/web-component/src"
 cp -r "$AUTH_LIBS_DIR/web-component/dist" "$HOT_DIR/portal/frontend/auth-libs/web-component/"
-echo "✅ Web component → portal"
+cp -r "$AUTH_LIBS_DIR/web-component/src" "$HOT_DIR/portal/frontend/auth-libs/web-component/"
+cp "$AUTH_LIBS_DIR/web-component/package.json" "$HOT_DIR/portal/frontend/auth-libs/web-component/"
+cp "$AUTH_LIBS_DIR/web-component/vite.config.js" "$HOT_DIR/portal/frontend/auth-libs/web-component/"
+echo "✅ Web component (source + dist) → portal"
 echo ""
 
 # Distribute Python package to portal
@@ -26,11 +30,15 @@ echo "✅ Python package → portal"
 echo ""
 
 # Distribute web component to drone-tm
-echo "📦 Distributing web-component dist/ to drone-tm..."
+echo "📦 Distributing web-component (source + dist) to drone-tm..."
 mkdir -p "$HOT_DIR/drone-tm/src/frontend/auth-libs/web-component"
 rm -rf "$HOT_DIR/drone-tm/src/frontend/auth-libs/web-component/dist"
+rm -rf "$HOT_DIR/drone-tm/src/frontend/auth-libs/web-component/src"
 cp -r "$AUTH_LIBS_DIR/web-component/dist" "$HOT_DIR/drone-tm/src/frontend/auth-libs/web-component/"
-echo "✅ Web component → drone-tm"
+cp -r "$AUTH_LIBS_DIR/web-component/src" "$HOT_DIR/drone-tm/src/frontend/auth-libs/web-component/"
+cp "$AUTH_LIBS_DIR/web-component/package.json" "$HOT_DIR/drone-tm/src/frontend/auth-libs/web-component/"
+cp "$AUTH_LIBS_DIR/web-component/vite.config.js" "$HOT_DIR/drone-tm/src/frontend/auth-libs/web-component/"
+echo "✅ Web component (source + dist) → drone-tm"
 echo ""
 
 # Distribute Python package to drone-tm
