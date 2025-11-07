@@ -413,6 +413,9 @@ def clear_osm_cookie(
 ) -> None:
     """Clear OSM connection cookie from response.
 
+    Tries multiple combinations of cookie attributes to ensure deletion
+    regardless of how the cookie was originally set.
+
     Usage:
         @app.post("/auth/osm/disconnect")
         async def disconnect_osm(
@@ -426,30 +429,34 @@ def clear_osm_cookie(
         response: FastAPI response
         config: Auth configuration
     """
-    # Use set_cookie with max_age=0 instead of delete_cookie
-    # This is more reliable for httpOnly cookies
-    response.set_cookie(
-        key="osm_connection",
-        value="",
-        httponly=True,
-        secure=config.cookie_secure,
-        samesite=config.cookie_samesite,
-        domain=config.cookie_domain,
-        max_age=0,
-        path="/",
-    )
+    # Try all combinations to ensure we delete the cookie regardless of how it was set
+    # Browsers require exact attribute match to delete a cookie
 
-    # Also clear without domain for old cookies
-    if config.cookie_domain:
-        response.set_cookie(
-            key="osm_connection",
-            value="",
-            httponly=True,
-            secure=config.cookie_secure,
-            samesite=config.cookie_samesite,
-            max_age=0,
-            path="/",
-        )
+    for secure in [True, False]:
+        for samesite in ["lax", "strict", "none"]:
+            # With domain
+            if config.cookie_domain:
+                response.set_cookie(
+                    key="osm_connection",
+                    value="",
+                    httponly=True,
+                    secure=secure,
+                    samesite=samesite,
+                    domain=config.cookie_domain,
+                    max_age=0,
+                    path="/",
+                )
+
+            # Without domain
+            response.set_cookie(
+                key="osm_connection",
+                value="",
+                httponly=True,
+                secure=secure,
+                samesite=samesite,
+                max_age=0,
+                path="/",
+            )
 
 
 # Type aliases for cleaner dependency injection
