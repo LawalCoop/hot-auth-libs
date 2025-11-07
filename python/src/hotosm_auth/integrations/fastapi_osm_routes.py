@@ -252,6 +252,8 @@ async def osm_disconnect(
             logger.error(f"Failed to revoke OSM tokens: {e}")
 
     # Clear the cookie regardless of revocation result
+    logger.info(f"🍪 Clearing OSM cookie with domain={config.cookie_domain}, secure={config.cookie_secure}, samesite={config.cookie_samesite}")
     clear_osm_cookie(response, config)
+    logger.info("🍪 Cookie clear command sent to response")
 
     return {"status": "disconnected", "tokens_revoked": tokens_revoked}
