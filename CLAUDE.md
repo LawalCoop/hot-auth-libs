@@ -146,3 +146,19 @@ async def get_me(user: CurrentUser):
 - ✅ Test in projects before committing
 - ✅ Commit dist/ in each project
 - ✅ Document breaking changes in commit messages
+
+## Git Commit Messages
+
+Keep commit messages simple and human-like:
+
+**DO:**
+- ✅ "Fix login redirect bug"
+- ✅ "Add OSM logout endpoint"
+- ✅ "Update deploy workflow secrets"
+
+**DON'T:**
+- ❌ Mention AI/Claude/automation
+- ❌ Use robotic language
+- ❌ Add unnecessary metadata
+
+Write as if a developer typed it quickly - concise, clear, natural.
