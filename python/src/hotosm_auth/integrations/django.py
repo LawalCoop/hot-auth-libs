@@ -133,7 +133,7 @@ from hotosm_auth.exceptions import (
     TokenInvalidError,
     CookieDecryptionError,
 )
-from hotosm_auth.logger import get_logger
+from hotosm_auth.logger import get_logger, log_auth_event
 
 logger = get_logger(__name__)
 
@@ -518,3 +518,170 @@ def clear_osm_cookie(response: HttpResponse) -> None:
     )
 
     logger.debug("Cookie deletion command issued")
+
+
+# ===================================================================
+# User Mapping Helpers (Django version)
+# ===================================================================
+# These helpers allow apps with existing user systems to map Hanko
+# user IDs to their existing user IDs.
+#
+# Example: fAIr uses osm_id as user identifier. When migrating to Hanko,
+# we create a mapping table that links hanko_user_id → osm_id.
+#
+# This is the Django-compatible version of the FastAPI get_mapped_user_id().
+# ===================================================================
+
+
+def get_mapped_user_id(
+    hanko_user: HankoUser,
+    app_name: str = "default",
+    auto_create: bool = False,
+    user_id_generator: Optional[Callable[[], str]] = None,
+) -> Optional[str]:
+    """Get application-specific user ID for a Hanko user (Django version).
+
+    This function looks up the mapping table to find the app-specific user ID
+    corresponding to a Hanko user.
+
+    Unlike the FastAPI version, this does NOT auto-create users or mappings.
+    It only looks up existing mappings. The app is responsible for creating
+    users and mappings through its own flow (e.g., after OSM connect).
+
+    Usage:
+        from hotosm_auth.integrations.django import get_mapped_user_id
+
+        def my_view(request):
+            hanko_user = request.hotosm.user
+            if not hanko_user:
+                return JsonResponse({"error": "Not authenticated"}, status=401)
+
+            # Look up mapping
+            osm_id = get_mapped_user_id(hanko_user, app_name="fair")
+
+            if osm_id is None:
+                # No mapping - user needs to complete onboarding
+                return JsonResponse({"needs_onboarding": True})
+
+            # Has mapping - get the user
+            user = OsmUser.objects.get(osm_id=osm_id)
+            return JsonResponse({"user": user.username})
+
+    Args:
+        hanko_user: Authenticated Hanko user
+        app_name: Application identifier (e.g., "fair", "drone-tm")
+        auto_create: If True and no mapping exists, create one using user_id_generator
+        user_id_generator: Function to generate new user ID (required if auto_create=True)
+
+    Returns:
+        str: Application-specific user ID, or None if no mapping exists
+    """
+    from django.db import connection
+
+    with connection.cursor() as cursor:
+        cursor.execute(
+            """
+            SELECT app_user_id
+            FROM hanko_user_mappings
+            WHERE hanko_user_id = %s AND app_name = %s
+            """,
+            [hanko_user.id, app_name],
+        )
+        row = cursor.fetchone()
+
+        if row:
+            app_user_id = row[0]
+            logger.debug(f"Found mapping: {hanko_user.id} → {app_user_id} ({app_name})")
+            log_auth_event(
+                "MAPPING_FOUND",
+                app_name,
+                hanko_user.id,
+                email=hanko_user.email,
+                app_user_id=app_user_id,
+            )
+            return app_user_id
+
+        # No mapping found
+        if not auto_create:
+            logger.debug(f"No mapping found for Hanko user {hanko_user.id} in {app_name}")
+            return None
+
+        # Auto-create mapping
+        if not user_id_generator:
+            raise ValueError("user_id_generator required when auto_create=True")
+
+        new_user_id = user_id_generator()
+
+        cursor.execute(
+            """
+            INSERT INTO hanko_user_mappings (hanko_user_id, app_user_id, app_name, created_at)
+            VALUES (%s, %s, %s, NOW())
+            """,
+            [hanko_user.id, str(new_user_id), app_name],
+        )
+
+        logger.info(f"Created mapping: {hanko_user.id} → {new_user_id} ({app_name})")
+        log_auth_event(
+            "MAPPING_CREATED",
+            app_name,
+            hanko_user.id,
+            email=hanko_user.email,
+            app_user_id=str(new_user_id),
+            source="auto",
+        )
+        return str(new_user_id)
+
+
+def create_user_mapping(
+    hanko_user_id: str,
+    app_user_id: str,
+    app_name: str = "default",
+) -> None:
+    """Manually create a user mapping (Django version).
+
+    Useful when user completes onboarding (e.g., after OSM connect or
+    choosing to skip OSM).
+
+    Usage:
+        from hotosm_auth.integrations.django import create_user_mapping
+
+        def complete_onboarding(request):
+            hanko_user = request.hotosm.user
+            osm_id = request.POST.get("osm_id")  # From OSM connect or generated
+
+            # Create the mapping
+            create_user_mapping(
+                hanko_user_id=hanko_user.id,
+                app_user_id=str(osm_id),
+                app_name="fair",
+            )
+
+            return JsonResponse({"success": True})
+
+    Args:
+        hanko_user_id: Hanko user UUID
+        app_user_id: Application-specific user ID (e.g., osm_id as string)
+        app_name: Application identifier
+
+    Raises:
+        IntegrityError: If mapping already exists
+    """
+    from django.db import connection
+
+    with connection.cursor() as cursor:
+        cursor.execute(
+            """
+            INSERT INTO hanko_user_mappings (hanko_user_id, app_user_id, app_name, created_at)
+            VALUES (%s, %s, %s, NOW())
+            """,
+            [hanko_user_id, app_user_id, app_name],
+        )
+
+    logger.info(f"Created mapping: {hanko_user_id} → {app_user_id} ({app_name})")
+    log_auth_event(
+        "MAPPING_CREATED",
+        app_name,
+        hanko_user_id,
+        app_user_id=app_user_id,
+        source="manual",
+    )

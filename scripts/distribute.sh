@@ -46,6 +46,9 @@ echo "📦 Distributing Python dist/ to drone-tm..."
 mkdir -p "$HOT_DIR/drone-tm/src/backend/auth-libs"
 rm -rf "$HOT_DIR/drone-tm/src/backend/auth-libs/dist"
 cp -r "$AUTH_LIBS_DIR/python/dist" "$HOT_DIR/drone-tm/src/backend/auth-libs/"
+# Copy wheel to libs/ directory (used by pyproject.toml/uv.lock)
+rm -f "$HOT_DIR/drone-tm/src/backend/libs/"hotosm_auth-*.whl
+cp "$AUTH_LIBS_DIR/python/dist/"*.whl "$HOT_DIR/drone-tm/src/backend/libs/"
 echo "✅ Python package → drone-tm"
 echo ""
 
@@ -69,6 +72,46 @@ cp "$AUTH_LIBS_DIR/web-component/vite.config.js" "$HOT_DIR/login/frontend/auth-l
 echo "✅ Web component (source + dist) → login"
 echo ""
 
+# Distribute web component to openaerialmap
+echo "📦 Distributing web-component (source + dist) to openaerialmap..."
+mkdir -p "$HOT_DIR/openaerialmap/frontend/auth-libs/web-component"
+rm -rf "$HOT_DIR/openaerialmap/frontend/auth-libs/web-component/dist"
+rm -rf "$HOT_DIR/openaerialmap/frontend/auth-libs/web-component/src"
+cp -r "$AUTH_LIBS_DIR/web-component/dist" "$HOT_DIR/openaerialmap/frontend/auth-libs/web-component/"
+cp -r "$AUTH_LIBS_DIR/web-component/src" "$HOT_DIR/openaerialmap/frontend/auth-libs/web-component/"
+cp "$AUTH_LIBS_DIR/web-component/package.json" "$HOT_DIR/openaerialmap/frontend/auth-libs/web-component/"
+cp "$AUTH_LIBS_DIR/web-component/vite.config.js" "$HOT_DIR/openaerialmap/frontend/auth-libs/web-component/"
+echo "✅ Web component (source + dist) → openaerialmap"
+echo ""
+
+# Distribute Python package to openaerialmap
+echo "📦 Distributing Python dist/ to openaerialmap..."
+mkdir -p "$HOT_DIR/openaerialmap/backend/stac-api/auth-libs"
+rm -rf "$HOT_DIR/openaerialmap/backend/stac-api/auth-libs/dist"
+cp -r "$AUTH_LIBS_DIR/python/dist" "$HOT_DIR/openaerialmap/backend/stac-api/auth-libs/"
+echo "✅ Python package → openaerialmap"
+echo ""
+
+# Distribute web component to fAIr
+echo "📦 Distributing web-component (source + dist) to fAIr..."
+mkdir -p "$HOT_DIR/fAIr/frontend/auth-libs/web-component"
+rm -rf "$HOT_DIR/fAIr/frontend/auth-libs/web-component/dist"
+rm -rf "$HOT_DIR/fAIr/frontend/auth-libs/web-component/src"
+cp -r "$AUTH_LIBS_DIR/web-component/dist" "$HOT_DIR/fAIr/frontend/auth-libs/web-component/"
+cp -r "$AUTH_LIBS_DIR/web-component/src" "$HOT_DIR/fAIr/frontend/auth-libs/web-component/"
+cp "$AUTH_LIBS_DIR/web-component/package.json" "$HOT_DIR/fAIr/frontend/auth-libs/web-component/"
+cp "$AUTH_LIBS_DIR/web-component/vite.config.js" "$HOT_DIR/fAIr/frontend/auth-libs/web-component/"
+echo "✅ Web component (source + dist) → fAIr"
+echo ""
+
+# Distribute Python package to fAIr
+echo "📦 Distributing Python dist/ to fAIr..."
+mkdir -p "$HOT_DIR/fAIr/backend/auth-libs"
+rm -rf "$HOT_DIR/fAIr/backend/auth-libs/dist"
+cp -r "$AUTH_LIBS_DIR/python/dist" "$HOT_DIR/fAIr/backend/auth-libs/"
+echo "✅ Python package → fAIr"
+echo ""
+
 echo "✅ Distribution complete!"
 echo ""
 echo "Don't forget to commit the dist/ folders in each project!"
@@ -80,3 +123,7 @@ echo "  - drone-tm/src/frontend/auth-libs/web-component/dist/"
 echo "  - drone-tm/src/backend/auth-libs/dist/"
 echo "  - login/backend/auth-libs/python/dist/"
 echo "  - login/frontend/auth-libs/web-component/dist/"
+echo "  - openaerialmap/frontend/auth-libs/web-component/dist/"
+echo "  - openaerialmap/backend/stac-api/auth-libs/dist/"
+echo "  - fAIr/frontend/auth-libs/web-component/dist/"
+echo "  - fAIr/backend/auth-libs/dist/"
