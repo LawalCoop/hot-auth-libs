@@ -18,10 +18,24 @@ __version__ = "0.1.0"
 from hotosm_auth.models import HankoUser, OSMConnection, OSMScope
 from hotosm_auth.config import AuthConfig
 
-__all__ = [
-    "HankoUser",
-    "OSMConnection",
-    "OSMScope",
-    "AuthConfig",
-    "__version__",
-]
+# SQLAlchemy model - only import if sqlalchemy is available (FastAPI projects)
+# Django projects use hotosm_auth_django.models instead
+try:
+    from hotosm_auth.db_models import HankoUserMapping
+    __all__ = [
+        "HankoUser",
+        "OSMConnection",
+        "OSMScope",
+        "AuthConfig",
+        "HankoUserMapping",
+        "__version__",
+    ]
+except ImportError:
+    # SQLAlchemy not installed (e.g., Django projects)
+    __all__ = [
+        "HankoUser",
+        "OSMConnection",
+        "OSMScope",
+        "AuthConfig",
+        "__version__",
+    ]

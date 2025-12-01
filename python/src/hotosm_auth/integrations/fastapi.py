@@ -115,7 +115,7 @@ from hotosm_auth.exceptions import (
     TokenInvalidError,
     CookieDecryptionError,
 )
-from hotosm_auth.logger import get_logger
+from hotosm_auth.logger import get_logger, log_auth_event
 
 logger = get_logger(__name__)
 
@@ -464,3 +464,207 @@ CurrentUser = Annotated[HankoUser, Depends(get_current_user)]
 CurrentUserOptional = Annotated[Optional[HankoUser], Depends(get_current_user_optional)]
 OSMConnectionDep = Annotated[Optional[OSMConnection], Depends(get_osm_connection)]
 OSMConnectionRequired = Annotated[OSMConnection, Depends(require_osm_connection)]
+
+
+# ===================================================================
+# User Mapping Helpers
+# ===================================================================
+# These helpers allow apps with existing user systems to map Hanko
+# user IDs to their existing user IDs.
+#
+# Example: Drone-TM has users with String IDs. When migrating to Hanko,
+# we don't want to change all foreign keys. Instead, we create a mapping
+# table that links hanko_user_id → drone_tm_user_id.
+#
+# See hotosm_auth.db_models.HankoUserMapping for the reference model.
+# ===================================================================
+
+
+async def get_mapped_user_id(
+    hanko_user: HankoUser,
+    db_conn,  # psycopg Connection or AsyncConnection
+    app_name: str = "default",
+    auto_create: bool = True,
+    email_lookup_fn=None,  # Optional: async (conn, email) -> Optional[user_id]
+    user_creator_fn=None,  # Optional: async (conn, hanko_user) -> user_id
+    user_id_generator=None,  # Optional: func() -> str to generate new IDs
+) -> str:
+    """Get application-specific user ID for a Hanko user.
+
+    This function looks up the mapping table to find the app-specific user ID
+    corresponding to a Hanko user. If no mapping exists and auto_create=True,
+    it attempts to link with existing users via email or creates a new user.
+
+    Usage (with email-based linking):
+        from hotosm_auth.integrations.fastapi import get_mapped_user_id, CurrentUser
+        from app.database import get_db
+
+        # Define lookup and creation functions
+        async def lookup_by_email(conn, email: str) -> Optional[str]:
+            user = await MyUser.get_by_email(conn, email)
+            return user.id if user else None
+
+        async def create_new_user(conn, hanko_user: HankoUser) -> str:
+            new_user = await MyUser.create(conn, email=hanko_user.email)
+            return new_user.id
+
+        @app.get("/me")
+        async def get_me(
+            hanko_user: CurrentUser,
+            db: Connection = Depends(get_db),
+        ):
+            # Get or create app user ID, linking by email if user exists
+            user_id = await get_mapped_user_id(
+                hanko_user=hanko_user,
+                db_conn=db,
+                app_name="drone-tm",
+                auto_create=True,
+                email_lookup_fn=lookup_by_email,
+                user_creator_fn=create_new_user,
+            )
+            return {"user_id": user_id}
+
+    Args:
+        hanko_user: Authenticated Hanko user
+        db_conn: psycopg Connection or AsyncConnection
+        app_name: Application identifier (useful for multi-app deployments)
+        auto_create: If True, create mapping if it doesn't exist
+        email_lookup_fn: Optional async function (conn, email) -> Optional[user_id]
+                        to search for existing users by email
+        user_creator_fn: Optional async function (conn, hanko_user) -> user_id
+                        to create new users in the app
+        user_id_generator: Optional function to generate new user IDs (fallback)
+                          If None and no creator_fn, uses hanko_user.id
+
+    Returns:
+        str: Application-specific user ID
+
+    Raises:
+        HTTPException: 403 if mapping doesn't exist and auto_create=False
+    """
+    # Look up existing mapping
+    async with db_conn.cursor() as cur:
+        await cur.execute(
+            """
+            SELECT app_user_id
+            FROM hanko_user_mappings
+            WHERE hanko_user_id = %s AND app_name = %s
+            """,
+            (hanko_user.id, app_name),
+        )
+        row = await cur.fetchone()
+
+        if row:
+            app_user_id = row[0]
+            logger.debug(f"Found mapping: {hanko_user.id} → {app_user_id}")
+            log_auth_event(
+                "MAPPING_FOUND",
+                app_name,
+                hanko_user.id,
+                email=hanko_user.email,
+                app_user_id=app_user_id,
+            )
+            return app_user_id
+
+        # No mapping found
+        if not auto_create:
+            logger.warning(f"No mapping found for Hanko user {hanko_user.id}")
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"User not authorized for {app_name}",
+            )
+
+        # Try to link with existing user by email
+        new_user_id = None
+        if email_lookup_fn:
+            logger.debug(f"Searching for existing user with email: {hanko_user.email}")
+            existing_user_id = await email_lookup_fn(db_conn, hanko_user.email)
+            if existing_user_id:
+                logger.info(f"Found existing user by email: {hanko_user.email} → {existing_user_id}")
+                new_user_id = existing_user_id
+
+        # If no existing user, try to create new user
+        if not new_user_id and user_creator_fn:
+            logger.debug(f"Creating new user for Hanko user: {hanko_user.id}")
+            new_user_id = await user_creator_fn(db_conn, hanko_user)
+            logger.info(f"Created new user: {new_user_id}")
+
+        # Fallback: use user_id_generator or hanko_user.id
+        if not new_user_id:
+            if user_id_generator:
+                new_user_id = user_id_generator()
+            else:
+                # Default: use Hanko ID as app user ID
+                new_user_id = hanko_user.id
+
+        # Create mapping
+        await cur.execute(
+            """
+            INSERT INTO hanko_user_mappings (hanko_user_id, app_user_id, app_name, created_at)
+            VALUES (%s, %s, %s, NOW())
+            """,
+            (hanko_user.id, new_user_id, app_name),
+        )
+
+        logger.info(f"Created mapping: {hanko_user.id} → {new_user_id} ({app_name})")
+        log_auth_event(
+            "MAPPING_CREATED",
+            app_name,
+            hanko_user.id,
+            email=hanko_user.email,
+            app_user_id=new_user_id,
+        )
+        return new_user_id
+
+
+async def create_user_mapping(
+    hanko_user_id: str,
+    app_user_id: str,
+    db_conn,  # psycopg Connection or AsyncConnection
+    app_name: str = "default",
+) -> None:
+    """Manually create a user mapping.
+
+    Useful for data migration when adding Hanko to an existing app.
+
+    Usage:
+        # Migration script
+        from hotosm_auth.integrations.fastapi import create_user_mapping
+
+        # For each existing user:
+        for user in existing_users:
+            # If user already has Hanko account:
+            if user.hanko_id:
+                await create_user_mapping(
+                    hanko_user_id=user.hanko_id,
+                    app_user_id=user.id,
+                    db_conn=db,
+                    app_name="drone-tm",
+                )
+
+    Args:
+        hanko_user_id: Hanko user UUID
+        app_user_id: Application-specific user ID
+        db_conn: psycopg Connection or AsyncConnection
+        app_name: Application identifier
+
+    Raises:
+        Exception: If mapping already exists or database error
+    """
+    async with db_conn.cursor() as cur:
+        await cur.execute(
+            """
+            INSERT INTO hanko_user_mappings (hanko_user_id, app_user_id, app_name, created_at)
+            VALUES (%s, %s, %s, NOW())
+            """,
+            (hanko_user_id, app_user_id, app_name),
+        )
+
+    logger.info(f"Manually created mapping: {hanko_user_id} → {app_user_id} ({app_name})")
+    log_auth_event(
+        "MAPPING_CREATED",
+        app_name,
+        hanko_user_id,
+        app_user_id=app_user_id,
+        source="manual",
+    )
