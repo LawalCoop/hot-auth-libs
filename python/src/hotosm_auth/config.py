@@ -91,6 +91,17 @@ class AuthConfig(BaseModel):
         description="JWKS cache TTL in seconds (default 1 hour)",
     )
 
+    # Admin configuration
+    admin_emails: str = Field(
+        "",
+        description="Comma-separated list of admin email addresses",
+    )
+
+    @property
+    def admin_email_list(self) -> list[str]:
+        """Parse admin_emails into a list of lowercase email addresses."""
+        return [e.strip().lower() for e in self.admin_emails.split(",") if e.strip()]
+
     def model_post_init(self, __context) -> None:
         """Validate configuration after initialization."""
         # If OSM is enabled, require client credentials
@@ -143,6 +154,7 @@ class AuthConfig(BaseModel):
             OSM_REDIRECT_URI: OSM OAuth redirect URI (optional, auto-generated from HANKO_API_URL if not set)
             OSM_SCOPES: Space-separated OSM scopes (default: "read_prefs")
             OSM_API_URL: OSM API URL (default: https://www.openstreetmap.org)
+            ADMIN_EMAILS: Comma-separated list of admin email addresses
 
         Example:
             # .env file
@@ -242,6 +254,9 @@ class AuthConfig(BaseModel):
         # Determine if OSM is enabled
         osm_enabled = bool(osm_client_id and osm_client_secret)
 
+        # Admin configuration
+        admin_emails = os.getenv("ADMIN_EMAILS", "")
+
         return cls(
             hanko_api_url=hanko_api_url,
             cookie_secret=cookie_secret,
@@ -256,6 +271,7 @@ class AuthConfig(BaseModel):
             osm_redirect_uri=osm_redirect_uri if osm_enabled else None,
             osm_scopes=osm_scopes if osm_enabled else [],
             osm_api_url=osm_api_url,
+            admin_emails=admin_emails,
         )
 
     class Config:

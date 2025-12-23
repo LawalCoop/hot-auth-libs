@@ -85,6 +85,70 @@ git add frontend/auth-libs backend/auth-libs
 git commit -m "Update auth-libs dist"
 ```
 
+## Version Updates
+
+When making changes to auth-libs that require a new version:
+
+### 1. Update Version
+
+Edit `python/pyproject.toml`:
+```toml
+version = "0.1.5"  # bump from 0.1.4
+```
+
+### 2. Build & Distribute
+
+```bash
+cd /home/willaru/dev/HOT/auth-libs
+./scripts/build.sh
+./scripts/distribute.sh
+```
+
+### 3. Update Project References
+
+Each project that uses auth-libs needs to update its `pyproject.toml`:
+
+**drone-tm** (`src/backend/pyproject.toml`):
+```toml
+hotosm-auth = { path = "libs/hotosm_auth-0.1.5-py3-none-any.whl" }
+```
+
+**fAIr** (`backend/pyproject.toml`):
+```toml
+hotosm-auth = { path = "auth-libs/dist/hotosm_auth-0.1.5-py3-none-any.whl" }
+```
+
+**portal** (`backend/pyproject.toml`):
+```toml
+hotosm-auth = { path = "auth-libs/python/dist/hotosm_auth-0.1.5-py3-none-any.whl" }
+```
+
+### 4. Update Docker Compose (hot-dev-env)
+
+If using hot-dev-env, update `docker-compose.yml` pip install commands:
+```yaml
+pip install ... /project/auth-libs/dist/hotosm_auth-0.1.5-py3-none-any.whl
+```
+
+### 5. Clean Old Wheels
+
+Remove old wheel versions from dist folders to avoid conflicts:
+```bash
+cd /home/willaru/dev/HOT/drone-tm/src/backend/libs
+rm hotosm_auth-0.1.[0-4]*.whl  # keep only latest
+
+cd /home/willaru/dev/HOT/fAIr/backend/auth-libs/dist
+rm hotosm_auth-0.1.[0-4]*.whl
+```
+
+### 6. Restart Containers
+
+Restart affected containers to pick up the new version:
+```bash
+cd /home/willaru/dev/HOT/hot-dev-env
+docker compose restart dronetm-backend fair-backend
+```
+
 ## Key Features
 
 ### Python Package (`hotosm_auth`)

@@ -162,6 +162,67 @@ Si necesitás modificar las librerías:
 
 ---
 
+## 🔄 Actualización de Versiones
+
+Cuando hacés cambios que requieren una nueva versión:
+
+### 1. Actualizar Versión
+
+Editá `python/pyproject.toml`:
+```toml
+version = "0.1.5"  # bump de 0.1.4
+```
+
+### 2. Build & Distribute
+
+```bash
+./scripts/build.sh
+./scripts/distribute.sh
+```
+
+### 3. Actualizar Referencias en Proyectos
+
+Cada proyecto que usa auth-libs necesita actualizar su `pyproject.toml`:
+
+**drone-tm** (`src/backend/pyproject.toml`):
+```toml
+hotosm-auth = { path = "libs/hotosm_auth-0.1.5-py3-none-any.whl" }
+```
+
+**fAIr** (`backend/pyproject.toml`):
+```toml
+hotosm-auth = { path = "auth-libs/dist/hotosm_auth-0.1.5-py3-none-any.whl" }
+```
+
+**portal** (`backend/pyproject.toml`):
+```toml
+hotosm-auth = { path = "auth-libs/python/dist/hotosm_auth-0.1.5-py3-none-any.whl" }
+```
+
+### 4. Actualizar Docker Compose (hot-dev-env)
+
+Si usás hot-dev-env, actualizá los comandos pip en `docker-compose.yml`:
+```yaml
+pip install ... /project/auth-libs/dist/hotosm_auth-0.1.5-py3-none-any.whl
+```
+
+### 5. Limpiar Wheels Viejos
+
+Eliminá versiones viejas de los wheels para evitar conflictos:
+```bash
+cd /path/to/project/auth-libs/dist
+rm hotosm_auth-0.1.[0-4]*.whl  # mantener solo la última
+```
+
+### 6. Reiniciar Containers
+
+Reiniciá los containers afectados para que tomen la nueva versión:
+```bash
+docker compose restart dronetm-backend fair-backend
+```
+
+---
+
 ## 📦 Publicación (para maintainers)
 
 Ver [../PUBLISHING.md](../PUBLISHING.md) para instrucciones completas de cómo publicar a PyPI y npm.

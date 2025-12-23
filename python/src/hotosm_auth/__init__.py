@@ -13,7 +13,7 @@ Key Features:
 - Legacy user mapping for gradual migration
 """
 
-__version__ = "0.1.0"
+__version__ = "0.1.4"
 
 from hotosm_auth.models import HankoUser, OSMConnection, OSMScope
 from hotosm_auth.config import AuthConfig
@@ -39,3 +39,36 @@ except ImportError:
         "AuthConfig",
         "__version__",
     ]
+
+# Admin functionality - only import if FastAPI is available
+try:
+    from hotosm_auth.integrations.fastapi_admin import AdminUser, require_admin
+    from hotosm_auth.integrations.fastapi_admin_routes import create_admin_mappings_router
+    from hotosm_auth.integrations.fastapi_admin_routes_psycopg import create_admin_mappings_router_psycopg
+    from hotosm_auth.schemas.admin import (
+        MappingResponse,
+        MappingListResponse,
+        MappingCreate,
+        MappingUpdate,
+    )
+    __all__.extend([
+        "AdminUser",
+        "require_admin",
+        "create_admin_mappings_router",
+        "create_admin_mappings_router_psycopg",
+        "MappingResponse",
+        "MappingListResponse",
+        "MappingCreate",
+        "MappingUpdate",
+    ])
+except ImportError:
+    # FastAPI not installed
+    pass
+
+# Django admin functionality - only import if Django is available
+try:
+    from hotosm_auth.integrations.django_admin_routes import create_admin_urlpatterns
+    __all__.append("create_admin_urlpatterns")
+except ImportError:
+    # Django not installed
+    pass
