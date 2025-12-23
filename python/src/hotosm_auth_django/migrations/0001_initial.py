@@ -8,47 +8,55 @@ class Migration(migrations.Migration):
     dependencies = []
 
     operations = [
-        migrations.CreateModel(
-            name='HankoUserMapping',
-            fields=[
-                ('hanko_user_id', models.CharField(
-                    help_text='Hanko user UUID from JWT',
-                    max_length=255,
-                    primary_key=True,
-                    serialize=False,
-                )),
-                ('app_user_id', models.CharField(
-                    help_text='Application user ID',
-                    max_length=255,
-                )),
-                ('app_name', models.CharField(
-                    default='default',
-                    help_text='Application name for multi-app deployments',
-                    max_length=255,
-                )),
-                ('created_at', models.DateTimeField(auto_now_add=True)),
-                ('updated_at', models.DateTimeField(
-                    auto_now=True,
-                    null=True,
-                    blank=True,
-                )),
-            ],
-            options={
-                'db_table': 'hanko_user_mappings',
-            },
+        # Create table if not exists (idempotent)
+        migrations.RunSQL(
+            sql="""
+                CREATE TABLE IF NOT EXISTS hanko_user_mappings (
+                    hanko_user_id VARCHAR(255) PRIMARY KEY,
+                    app_user_id VARCHAR(255) NOT NULL,
+                    app_name VARCHAR(255) NOT NULL DEFAULT 'default',
+                    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+                    updated_at TIMESTAMP NULL
+                );
+            """,
+            reverse_sql="DROP TABLE IF EXISTS hanko_user_mappings;",
         ),
-        migrations.AddConstraint(
-            model_name='hankousermapping',
-            constraint=models.UniqueConstraint(
-                fields=('hanko_user_id', 'app_name'),
-                name='uq_hanko_app',
-            ),
+        # Add updated_at column if not exists (for tables created before this column was added)
+        migrations.RunSQL(
+            sql="""
+                DO $$
+                BEGIN
+                    IF NOT EXISTS (
+                        SELECT 1 FROM information_schema.columns
+                        WHERE table_name = 'hanko_user_mappings' AND column_name = 'updated_at'
+                    ) THEN
+                        ALTER TABLE hanko_user_mappings ADD COLUMN updated_at TIMESTAMP NULL;
+                    END IF;
+                END $$;
+            """,
+            reverse_sql="",  # No reverse needed
         ),
-        migrations.AddIndex(
-            model_name='hankousermapping',
-            index=models.Index(
-                fields=['app_user_id', 'app_name'],
-                name='idx_app_user_id',
-            ),
+        # Add unique constraint if not exists
+        migrations.RunSQL(
+            sql="""
+                DO $$
+                BEGIN
+                    IF NOT EXISTS (
+                        SELECT 1 FROM pg_constraint WHERE conname = 'uq_hanko_app'
+                    ) THEN
+                        ALTER TABLE hanko_user_mappings
+                        ADD CONSTRAINT uq_hanko_app UNIQUE (hanko_user_id, app_name);
+                    END IF;
+                END $$;
+            """,
+            reverse_sql="ALTER TABLE hanko_user_mappings DROP CONSTRAINT IF EXISTS uq_hanko_app;",
+        ),
+        # Add index if not exists
+        migrations.RunSQL(
+            sql="""
+                CREATE INDEX IF NOT EXISTS idx_app_user_id
+                ON hanko_user_mappings (app_user_id, app_name);
+            """,
+            reverse_sql="DROP INDEX IF EXISTS idx_app_user_id;",
         ),
     ]
