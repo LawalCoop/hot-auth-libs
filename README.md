@@ -1,6 +1,6 @@
-# HOTOSM Auth Packages
+# HOTOSM Auth Libraries
 
-Esta carpeta contiene las librerías listas para usar en tus proyectos.
+Librerías de autenticación compartidas para todos los proyectos HOTOSM.
 
 ## 📦 Contenido
 
@@ -8,27 +8,20 @@ Esta carpeta contiene las librerías listas para usar en tus proyectos.
 
 **Librería Python** para integración con FastAPI y Django.
 
-```bash
-# Para desarrollo local (desde esta carpeta)
-pip install -e ./python
-
-# O copiar la carpeta python/ a tu proyecto
-cp -r packages/python /path/to/your/project/hotosm-auth
-pip install -e ./hotosm-auth
+**Instalación** (en tu `pyproject.toml`):
+```python
+dependencies = [
+    "hotosm-auth @ git+https://github.com/LawalCoop/hot-auth-libs.git@v0.1.8#subdirectory=python",
+]
 ```
 
 **Uso**:
 ```python
-# FastAPI
-from hotosm_auth.fastapi import setup_auth, Auth
-app = FastAPI()
-setup_auth(app)
+from hotosm_auth.integrations.fastapi import CurrentUser
 
-# Django
-# settings.py
-MIDDLEWARE = [
-    'hotosm_auth.integrations.django.HankoAuthMiddleware',
-]
+@router.get("/me")
+async def get_me(user: CurrentUser):
+    return {"id": user.id, "email": user.email}
 ```
 
 📚 **Documentación completa**: [python/README.md](./python/README.md)
@@ -39,64 +32,116 @@ MIDDLEWARE = [
 
 **Componente web** para el frontend (HTML/JS).
 
-```bash
-# Para desarrollo local
-cd web-component/
-npm install
-npm run build
-
-# Los archivos built están en dist/
-# Copiar dist/ a tu proyecto estático
-```
-
 **Uso**:
 ```html
-<!DOCTYPE html>
-<html>
 <head>
     <meta name="hanko-url" content="https://login.hotosm.org">
-    <script src="dist/hanko-auth.iife.js"></script>
+    <script src="auth-libs/web-component/dist/hanko-auth.iife.js"></script>
 </head>
 <body>
-    <hotosm-auth></hotosm-auth>
+    <hotosm-auth show-profile></hotosm-auth>
 </body>
-</html>
 ```
 
 📚 **Documentación completa**: [web-component/README.md](./web-component/README.md)
 
 ---
 
-## 🚀 Quick Start para un Nuevo Proyecto
+## 🚀 Distribución
 
-### Opción 1: Copiar la Carpeta Completa
+Auth-libs usa dos métodos de distribución diferentes:
 
-```bash
-# Copiar todo packages/ a tu proyecto
-cp -r /path/to/login/packages /path/to/your-project/
+### Python (Backend)
 
-# Instalar dependencias
-cd /path/to/your-project/packages/python
-pip install -e .
+**Método**: Git+HTTPS con tags de versión
 
-cd /path/to/your-project/packages/web-component
-npm install
-npm run build
+Los proyectos referencian auth-libs directamente desde GitHub:
+```python
+"hotosm-auth @ git+https://github.com/LawalCoop/hot-auth-libs.git@v0.1.8#subdirectory=python",
 ```
 
-### Opción 2: Instalar desde PyPI/npm (cuando estén publicados)
+- No hay wheels que distribuir ni commitear
+- `uv lock` regenera el lockfile con la versión especificada
+
+### Web Component (Frontend)
+
+**Método**: Build y distribute via script
+
+Los bundles JS se copian a cada proyecto:
+```bash
+./scripts/build.sh      # Compila JS bundles
+./scripts/distribute.sh # Copia a todos los proyectos
+```
+
+- Los archivos se commitean en cada proyecto
+- Necesario para hot-reload local y Docker builds
+
+---
+
+## 🔄 Releasing a New Version
+
+### 1. Hacer cambios
+
+Editar código fuente:
+- Python: `python/hotosm_auth/`
+- Web component: `web-component/src/`
+
+### 2. Actualizar versión
+
+Editar `python/pyproject.toml`:
+```toml
+version = "0.1.9"  # bump de 0.1.8
+```
+
+### 3. Build y distribute web component
 
 ```bash
-# Python
-pip install hotosm-auth[fastapi]  # o [django]
+./scripts/build.sh
+./scripts/distribute.sh
+```
 
-# Web Component
-npm install @hotosm/hanko-auth
+### 4. Commit y tag
+
+```bash
+git add .
+git commit -m "Add new feature"
+git push
+git tag v0.1.9
+git push --tags
+```
+
+### 5. Actualizar proyectos
+
+**Para Python (backend)**:
+
+Cambiar el tag en `pyproject.toml` de cada proyecto:
+```python
+# Cambiar @v0.1.8 a @v0.1.9
+"hotosm-auth @ git+https://github.com/LawalCoop/hot-auth-libs.git@v0.1.9#subdirectory=python",
+```
+
+Regenerar lockfile:
+```bash
+uv lock
+```
+
+**Para Web Component (frontend)**:
+
+Ya distribuido en paso 3. Solo commitear los archivos:
+```bash
+git add frontend/auth-libs/
+git commit -m "Update auth-libs to v0.1.9"
+```
+
+### 6. Push en todos los proyectos
+
+```bash
+git push
 ```
 
 ---
 
-## 📋 Configuración Mínima
+## 📋 Configuración
 
 ### Backend (.env)
 ```bash
@@ -111,121 +156,32 @@ OSM_CLIENT_SECRET=your-osm-client-secret
 ### Frontend (HTML)
 ```html
 <meta name="hanko-url" content="https://login.hotosm.org">
-<script src="dist/hanko-auth.iife.js"></script>
+<script src="auth-libs/web-component/dist/hanko-auth.iife.js"></script>
 <hotosm-auth></hotosm-auth>
 ```
 
 ---
 
-## 🎯 Arquitectura Recomendada para Producción
+## 📚 Proyectos que usan auth-libs
 
-```
-Subdominios (recomendado):
-├── login.hotosm.org          → Hanko (auth service)
-├── api.yourapp.com           → Tu backend (FastAPI/Django)
-└── app.yourapp.com           → Tu frontend
+### Backend (Python)
 
-Configuración:
-- Backend corre en root path /
-- Frontend corre en root path /
-- No se necesita stripPrefix ni base-path
-- Cookies se comparten con domain=.yourapp.com
-```
+| Proyecto | Archivo |
+|----------|---------|
+| portal | `backend/pyproject.toml` |
+| drone-tm | `src/backend/pyproject.toml` |
+| fAIr | `backend/pyproject.toml` |
+| openaerialmap | `backend/stac-api/pyproject.toml` |
 
----
+### Frontend (Web Component)
 
-## 📚 Ejemplos Completos
-
-Ver la carpeta `../playgrounds/` en este repo para ejemplos funcionando de:
-- FastAPI + hotosm-auth
-- Django + hotosm-auth
-- Frontend puro JS
-
----
-
-## 🔧 Desarrollo
-
-Si necesitás modificar las librerías:
-
-1. Hacé cambios en `python/` o `web-component/`
-2. Probá en los playgrounds (`../playgrounds/`)
-3. Rebuild:
-   ```bash
-   # Python
-   cd python/
-   python3 -m build
-
-   # Web Component
-   cd web-component/
-   npm run build
-   ```
-
----
-
-## 🔄 Actualización de Versiones
-
-Cuando hacés cambios que requieren una nueva versión:
-
-### 1. Actualizar Versión
-
-Editá `python/pyproject.toml`:
-```toml
-version = "0.1.5"  # bump de 0.1.4
-```
-
-### 2. Build & Distribute
-
-```bash
-./scripts/build.sh
-./scripts/distribute.sh
-```
-
-### 3. Actualizar Referencias en Proyectos
-
-Cada proyecto que usa auth-libs necesita actualizar su `pyproject.toml`:
-
-**drone-tm** (`src/backend/pyproject.toml`):
-```toml
-hotosm-auth = { path = "libs/hotosm_auth-0.1.5-py3-none-any.whl" }
-```
-
-**fAIr** (`backend/pyproject.toml`):
-```toml
-hotosm-auth = { path = "auth-libs/dist/hotosm_auth-0.1.5-py3-none-any.whl" }
-```
-
-**portal** (`backend/pyproject.toml`):
-```toml
-hotosm-auth = { path = "auth-libs/python/dist/hotosm_auth-0.1.5-py3-none-any.whl" }
-```
-
-### 4. Actualizar Docker Compose (hot-dev-env)
-
-Si usás hot-dev-env, actualizá los comandos pip en `docker-compose.yml`:
-```yaml
-pip install ... /project/auth-libs/dist/hotosm_auth-0.1.5-py3-none-any.whl
-```
-
-### 5. Limpiar Wheels Viejos
-
-Eliminá versiones viejas de los wheels para evitar conflictos:
-```bash
-cd /path/to/project/auth-libs/dist
-rm hotosm_auth-0.1.[0-4]*.whl  # mantener solo la última
-```
-
-### 6. Reiniciar Containers
-
-Reiniciá los containers afectados para que tomen la nueva versión:
-```bash
-docker compose restart dronetm-backend fair-backend
-```
-
----
-
-## 📦 Publicación (para maintainers)
-
-Ver [../PUBLISHING.md](../PUBLISHING.md) para instrucciones completas de cómo publicar a PyPI y npm.
+| Proyecto | Ubicación |
+|----------|-----------|
+| portal | `frontend/auth-libs/web-component/dist/` |
+| drone-tm | `src/frontend/auth-libs/web-component/dist/` |
+| fAIr | `frontend/auth-libs/web-component/dist/` |
+| openaerialmap | `frontend/auth-libs/web-component/dist/` |
+| login | `frontend/auth-libs/web-component/dist/` |
 
 ---
 
