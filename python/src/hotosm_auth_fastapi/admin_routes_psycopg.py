@@ -1,28 +1,24 @@
 """
 FastAPI admin routes for managing user mappings (psycopg version).
 
-This module provides the same functionality as fastapi_admin_routes.py
+This module provides the same functionality as admin_routes.py
 but uses psycopg3 directly instead of SQLAlchemy.
 
-## Usage
+Usage:
+    from fastapi import FastAPI
+    from hotosm_auth import AuthConfig
+    from hotosm_auth_fastapi import init_auth, create_admin_mappings_router_psycopg
+    from app.db.database import get_db
 
-```python
-from fastapi import FastAPI
-from hotosm_auth import AuthConfig
-from hotosm_auth.integrations.fastapi import init_auth
-from hotosm_auth.integrations.fastapi_admin_routes_psycopg import create_admin_mappings_router_psycopg
-from app.db.database import get_db
+    app = FastAPI()
 
-app = FastAPI()
+    # Initialize auth
+    config = AuthConfig.from_env()
+    init_auth(config)
 
-# Initialize auth
-config = AuthConfig.from_env()
-init_auth(config)
-
-# Create and register admin router
-admin_router = create_admin_mappings_router_psycopg(get_db, app_name="drone-tm")
-app.include_router(admin_router)
-```
+    # Create and register admin router
+    admin_router = create_admin_mappings_router_psycopg(get_db, app_name="drone-tm")
+    app.include_router(admin_router)
 """
 
 from typing import Callable
@@ -35,7 +31,7 @@ from hotosm_auth.schemas.admin import (
     MappingCreate,
     MappingUpdate,
 )
-from hotosm_auth.integrations.fastapi_admin import AdminUser
+from hotosm_auth_fastapi.admin import AdminUser
 from hotosm_auth.logger import get_logger
 
 logger = get_logger(__name__)

@@ -11,10 +11,10 @@ Routes:
 
 Usage:
     # urls.py
-    from hotosm_auth.integrations import django_osm_views
+    from hotosm_auth_django import osm_urlpatterns
 
     urlpatterns = [
-        path('', include(django_osm_views.urlpatterns)),
+        path('', include(osm_urlpatterns)),
     ]
 """
 
@@ -30,9 +30,8 @@ from django.urls import path
 
 from hotosm_auth.models import HankoUser, OSMConnection
 from hotosm_auth.osm_oauth import OSMOAuthClient
-from hotosm_auth.exceptions import OSMOAuthError, AuthenticationError
-from hotosm_auth.integrations.django import (
-    get_current_user,
+from hotosm_auth.exceptions import OSMOAuthError
+from hotosm_auth_django.middleware import (
     get_osm_connection,
     set_osm_cookie,
     clear_osm_cookie,
@@ -56,15 +55,8 @@ def osm_login(request: HttpRequest):
 
     Requires Hanko authentication first.
     Redirects to OSM authorization page.
-
-    Usage:
-        <a href="/auth/osm/login">Connect OSM</a>
-
-    Or from the web component:
-        <hotosm-auth osm-enabled="true"></hotosm-auth>
     """
     # Get current user from middleware (requires Hanko authentication)
-    # The HankoAuthMiddleware adds request.hotosm.user automatically
     logger.debug(f"OSM login called for {request.path}")
     logger.debug(f"Has hotosm attribute: {hasattr(request, 'hotosm')}")
 
@@ -126,8 +118,6 @@ def osm_callback(request: HttpRequest):
 
     OSM redirects here after user authorizes.
     Exchanges code for token and stores in httpOnly cookie.
-
-    This route is called automatically by OSM after authorization.
     """
     code = request.GET.get("code")
     state = request.GET.get("state")
@@ -197,7 +187,6 @@ def osm_callback(request: HttpRequest):
         )
 
         # Redirect back to the page stored in state during login
-        # (redirect_url was already extracted from state_data above)
         response = redirect(redirect_url)
 
         # Set encrypted cookie
@@ -218,28 +207,6 @@ def osm_status(request: HttpRequest):
     Check OSM connection status.
 
     Returns connection details if connected, or {connected: false} if not.
-
-    Usage:
-        const response = await fetch('/auth/osm/status', {
-            credentials: 'include'
-        });
-        const data = await response.json();
-
-        if (data.connected) {
-            console.log('OSM user:', data.osm_username);
-        }
-
-    Returns:
-        {
-            "connected": true,
-            "osm_user_id": 12345,
-            "osm_username": "mapper123",
-            "osm_avatar_url": "https://..."
-        }
-
-        or
-
-        {"connected": false}
     """
     osm: Optional[OSMConnection] = get_osm_connection(request)
 
@@ -265,19 +232,6 @@ def osm_disconnect(request: HttpRequest):
 
     Note: This endpoint does NOT require authentication because it's called
     during logout when the JWT may have already been cleared.
-
-    Usage:
-        const response = await fetch('/auth/osm/disconnect', {
-            method: 'POST',
-            credentials: 'include'
-        });
-
-        if (response.ok) {
-            console.log('OSM disconnected');
-        }
-
-    Returns:
-        {"status": "disconnected", "tokens_revoked": boolean}
     """
     logger.debug(f"OSM disconnect called for {request.path}")
 

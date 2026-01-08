@@ -19,7 +19,7 @@ from fastapi.responses import RedirectResponse
 from hotosm_auth.models import HankoUser, OSMConnection
 from hotosm_auth.osm_oauth import OSMOAuthClient
 from hotosm_auth.exceptions import OSMOAuthError
-from hotosm_auth.integrations.fastapi import (
+from hotosm_auth_fastapi.dependencies import (
     get_current_user,
     get_osm_connection,
     set_osm_cookie,
@@ -50,12 +50,6 @@ async def osm_login(
 
     Requires Hanko authentication first.
     Redirects to OSM authorization page.
-
-    Usage:
-        <a href="/auth/osm/login">Connect OSM</a>
-
-    Or from the web component:
-        <hotosm-auth osm-enabled="true"></hotosm-auth>
     """
     config = get_config()
 
@@ -107,8 +101,6 @@ async def osm_callback(
 
     OSM redirects here after user authorizes.
     Exchanges code for token and stores in httpOnly cookie.
-
-    This route is called automatically by OSM after authorization.
     """
     config = get_config()
 
@@ -165,28 +157,6 @@ async def osm_status(
     Check OSM connection status.
 
     Returns connection details if connected, or {connected: false} if not.
-
-    Usage:
-        const response = await fetch('/auth/osm/status', {
-            credentials: 'include'
-        });
-        const data = await response.json();
-
-        if (data.connected) {
-            console.log('OSM user:', data.osm_username);
-        }
-
-    Returns:
-        {
-            "connected": true,
-            "osm_user_id": 12345,
-            "osm_username": "mapper123",
-            "osm_avatar_url": "https://..."
-        }
-
-        or
-
-        {"connected": false}
     """
     if not osm:
         return {"connected": False}
@@ -212,19 +182,6 @@ async def osm_disconnect(
 
     Note: This endpoint does NOT require Hanko authentication because it's called
     during logout when the JWT may have already been cleared.
-
-    Usage:
-        const response = await fetch('/auth/osm/disconnect', {
-            method: 'POST',
-            credentials: 'include'
-        });
-
-        if (response.ok) {
-            console.log('OSM disconnected');
-        }
-
-    Returns:
-        {"status": "disconnected", "tokens_revoked": boolean}
     """
     config = get_config()
     tokens_revoked = False
@@ -252,8 +209,8 @@ async def osm_disconnect(
             logger.error(f"Failed to revoke OSM tokens: {e}")
 
     # Clear the cookie regardless of revocation result
-    logger.info(f"🍪 Clearing OSM cookie with domain={config.cookie_domain}, secure={config.cookie_secure}, samesite={config.cookie_samesite}")
+    logger.info(f"Clearing OSM cookie with domain={config.cookie_domain}, secure={config.cookie_secure}, samesite={config.cookie_samesite}")
     clear_osm_cookie(response, config)
-    logger.info("🍪 Cookie clear command sent to response")
+    logger.info("Cookie clear command sent to response")
 
     return {"status": "disconnected", "tokens_revoked": tokens_revoked}

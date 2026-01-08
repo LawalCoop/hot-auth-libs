@@ -1,19 +1,15 @@
 """
-FastAPI admin authentication for hotosm-auth.
+FastAPI admin authentication.
 
 Provides dependency for requiring admin access based on email whitelist.
 
-## Usage
+Usage:
+    from hotosm_auth_fastapi import CurrentUser, AdminUser
 
-```python
-from hotosm_auth.integrations.fastapi import CurrentUser
-from hotosm_auth.integrations.fastapi_admin import require_admin, AdminUser
-
-@router.get("/admin/users")
-async def list_users(admin: AdminUser):
-    # Only users with email in ADMIN_EMAILS can access this
-    return {"admin_email": admin.email}
-```
+    @router.get("/admin/users")
+    async def list_users(admin: AdminUser):
+        # Only users with email in ADMIN_EMAILS can access this
+        return {"admin_email": admin.email}
 """
 
 from typing import Annotated
@@ -22,7 +18,7 @@ from fastapi import Depends, HTTPException, status
 
 from hotosm_auth.config import AuthConfig
 from hotosm_auth.models import HankoUser
-from hotosm_auth.integrations.fastapi import get_current_user, get_config
+from hotosm_auth_fastapi.dependencies import get_current_user, get_config
 from hotosm_auth.logger import get_logger
 
 logger = get_logger(__name__)

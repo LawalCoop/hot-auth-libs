@@ -1,35 +1,24 @@
 """
-FastAPI admin routes for managing user mappings.
+FastAPI admin routes for managing user mappings (SQLAlchemy version).
 
 Provides a router factory that apps can use to expose admin endpoints
 for managing Hanko user mappings.
 
-## Usage
+Usage:
+    from fastapi import FastAPI
+    from hotosm_auth import AuthConfig
+    from hotosm_auth_fastapi import init_auth, create_admin_mappings_router
+    from app.database import get_db
 
-```python
-from fastapi import FastAPI
-from hotosm_auth import AuthConfig
-from hotosm_auth.integrations.fastapi import init_auth
-from hotosm_auth.integrations.fastapi_admin_routes import create_admin_mappings_router
-from app.database import get_db
+    app = FastAPI()
 
-app = FastAPI()
+    # Initialize auth
+    config = AuthConfig.from_env()
+    init_auth(config)
 
-# Initialize auth
-config = AuthConfig.from_env()
-init_auth(config)
-
-# Create and register admin router
-admin_router = create_admin_mappings_router(get_db)
-app.include_router(admin_router, prefix="/api")
-```
-
-This exposes:
-- GET  /api/admin/mappings - List all mappings (paginated)
-- GET  /api/admin/mappings/{hanko_user_id} - Get single mapping
-- POST /api/admin/mappings - Create mapping
-- PUT  /api/admin/mappings/{hanko_user_id} - Update mapping
-- DELETE /api/admin/mappings/{hanko_user_id} - Delete mapping
+    # Create and register admin router
+    admin_router = create_admin_mappings_router(get_db)
+    app.include_router(admin_router, prefix="/api")
 """
 
 from typing import Callable
@@ -43,7 +32,7 @@ from hotosm_auth.schemas.admin import (
     MappingCreate,
     MappingUpdate,
 )
-from hotosm_auth.integrations.fastapi_admin import AdminUser
+from hotosm_auth_fastapi.admin import AdminUser
 from hotosm_auth.logger import get_logger
 
 logger = get_logger(__name__)

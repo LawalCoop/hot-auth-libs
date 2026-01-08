@@ -1,5 +1,5 @@
 """
-Django integration for hotosm-auth.
+Django middleware and authentication utilities.
 
 Provides:
 - Middleware for automatic JWT validation
@@ -7,112 +7,27 @@ Provides:
 - Request utilities for accessing user and OSM connection
 - Cookie management for OSM tokens
 
-## Quick Start
+Quick Start:
+    1. Add middleware to settings.py:
 
-1. Create a `.env` file with minimal configuration:
+    MIDDLEWARE = [
+        ...
+        'hotosm_auth_django.HankoAuthMiddleware',
+    ]
 
-```bash
-# Required
-HANKO_API_URL=https://login.hotosm.org
-COOKIE_SECRET=your-secret-key-min-32-bytes-long
+    2. Use in your views:
 
-# Optional - for OSM integration
-OSM_CLIENT_ID=your-osm-client-id
-OSM_CLIENT_SECRET=your-osm-client-secret
+    from hotosm_auth_django import login_required, osm_required
 
-# ✨ Everything else is auto-detected!
-# - COOKIE_DOMAIN: from HANKO_API_URL → ".hotosm.org"
-# - COOKIE_SECURE: from HANKO_API_URL scheme → true (https)
-# - OSM_REDIRECT_URI: auto-generated → "{HANKO_API_URL}/auth/osm/callback"
-```
+    @login_required
+    def my_view(request):
+        user = request.hotosm.user  # HankoUser object
+        osm = request.hotosm.osm    # Optional[OSMConnection]
 
-2. Add middleware to settings.py:
-
-```python
-# settings.py
-MIDDLEWARE = [
-    ...
-    'hotosm_auth.integrations.django.HankoAuthMiddleware',
-]
-
-# No HOTOSM_AUTH dict needed! Config loads from .env automatically
-```
-
-3. Use in your views:
-
-```python
-from hotosm_auth.integrations.django import login_required, osm_required
-
-@login_required
-def my_view(request):
-    user = request.hotosm.user  # HankoUser object
-    osm = request.hotosm.osm    # Optional[OSMConnection]
-
-    return JsonResponse({
-        "user": user.email,
-        "osm": osm.osm_username if osm else None
-    })
-```
-
-## Request Attributes
-
-After adding the middleware, every request has:
-
-- `request.hotosm.user` - Current authenticated user (HankoUser or None)
-- `request.hotosm.osm` - OSM connection (OSMConnection or None)
-
-## Decorators
-
-- `@login_required` - Requires Hanko authentication, returns 401 if not authenticated
-- `@osm_required` - Requires OSM connection, returns 403 if not connected
-
-## Example: Public View (Optional Auth)
-
-```python
-def public_view(request):
-    user = request.hotosm.user
-
-    if user:
-        return HttpResponse(f"Hello {user.email}")
-    return HttpResponse("Hello anonymous")
-```
-
-## Example: OSM Required View
-
-```python
-@login_required
-@osm_required
-def osm_view(request):
-    osm = request.hotosm.osm
-    return HttpResponse(f"OSM Username: {osm.osm_username}")
-```
-
-## Logging
-
-Control log verbosity with the LOG_LEVEL environment variable:
-
-```bash
-LOG_LEVEL=DEBUG   # Show all debug messages
-LOG_LEVEL=INFO    # Show info and above
-LOG_LEVEL=WARNING # Show warnings and errors only (default)
-LOG_LEVEL=ERROR   # Show errors only
-```
-
-## Legacy Configuration
-
-For backwards compatibility, you can still use Django settings dict:
-
-```python
-HOTOSM_AUTH = {
-    "hanko_api_url": "https://login.hotosm.org",
-    "cookie_secret": "your-secret-key",
-    "cookie_domain": ".hotosm.org",
-    "osm_enabled": True,
-    # ... other AuthConfig fields
-}
-```
-
-However, the .env method is recommended for simpler configuration.
+        return JsonResponse({
+            "user": user.email,
+            "osm": osm.osm_username if osm else None
+        })
 """
 
 from typing import Optional, Callable
@@ -218,12 +133,6 @@ def get_token_from_request(request: HttpRequest) -> Optional[str]:
     Priority:
     1. Authorization header (Bearer token)
     2. hanko cookie
-
-    Args:
-        request: Django request
-
-    Returns:
-        str: JWT token or None
     """
     # Try Authorization header first
     auth_header = request.META.get("HTTP_AUTHORIZATION", "")
@@ -235,14 +144,7 @@ def get_token_from_request(request: HttpRequest) -> Optional[str]:
 
 
 async def get_current_user(request: HttpRequest) -> Optional[HankoUser]:
-    """Get authenticated user from request.
-
-    Args:
-        request: Django request
-
-    Returns:
-        HankoUser or None
-    """
+    """Get authenticated user from request."""
     token = get_token_from_request(request)
 
     if not token:
@@ -267,14 +169,7 @@ async def get_current_user(request: HttpRequest) -> Optional[HankoUser]:
 
 
 def get_osm_connection(request: HttpRequest) -> Optional[OSMConnection]:
-    """Get OSM connection from encrypted cookie.
-
-    Args:
-        request: Django request
-
-    Returns:
-        OSMConnection or None
-    """
+    """Get OSM connection from encrypted cookie."""
     encrypted = request.COOKIES.get("osm_connection")
 
     if not encrypted:
@@ -345,7 +240,7 @@ class HankoAuthMiddleware:
     Installation:
         MIDDLEWARE = [
             ...
-            'hotosm_auth.django.HankoAuthMiddleware',
+            'hotosm_auth_django.HankoAuthMiddleware',
         ]
 
     Usage in views:
@@ -359,22 +254,9 @@ class HankoAuthMiddleware:
     """
 
     def __init__(self, get_response: Callable):
-        """Initialize middleware.
-
-        Args:
-            get_response: Next middleware or view
-        """
         self.get_response = get_response
 
     def __call__(self, request: HttpRequest) -> HttpResponse:
-        """Process request.
-
-        Args:
-            request: Django request
-
-        Returns:
-            HttpResponse: Response from view
-        """
         # Add namespace with lazy-loaded user and OSM connection
         request.hotosm = _HOTOSMNamespace(request)
 
@@ -390,20 +272,7 @@ class HankoAuthMiddleware:
 
 
 def login_required(view_func: Callable) -> Callable:
-    """Decorator to require authentication.
-
-    Usage:
-        @login_required
-        def my_view(request):
-            user = request.hanko_user
-            return HttpResponse(f"Hello {user.email}")
-
-    Args:
-        view_func: View function to decorate
-
-    Returns:
-        Wrapped view function
-    """
+    """Decorator to require authentication."""
     @wraps(view_func)
     def wrapper(request: HttpRequest, *args, **kwargs):
         if not hasattr(request, "hanko_user") or not request.hanko_user:
@@ -417,21 +286,7 @@ def login_required(view_func: Callable) -> Callable:
 
 
 def osm_required(view_func: Callable) -> Callable:
-    """Decorator to require OSM connection.
-
-    Usage:
-        @login_required
-        @osm_required
-        def my_view(request):
-            osm = request.osm_connection
-            return HttpResponse(f"OSM user: {osm.osm_username}")
-
-    Args:
-        view_func: View function to decorate
-
-    Returns:
-        Wrapped view function
-    """
+    """Decorator to require OSM connection."""
     @wraps(view_func)
     def wrapper(request: HttpRequest, *args, **kwargs):
         if not hasattr(request, "osm_connection") or not request.osm_connection:
@@ -448,21 +303,7 @@ def set_osm_cookie(
     response: HttpResponse,
     osm_connection: OSMConnection,
 ) -> None:
-    """Set encrypted OSM connection cookie on response.
-
-    Usage:
-        def osm_callback(request):
-            # ... OSM OAuth flow ...
-            osm_conn = OSMConnection(...)
-
-            response = HttpResponse("OSM connected!")
-            set_osm_cookie(response, osm_conn)
-            return response
-
-    Args:
-        response: Django response
-        osm_connection: OSM connection data to encrypt
-    """
+    """Set encrypted OSM connection cookie on response."""
     config = get_auth_config()
     crypto = get_cookie_crypto()
 
@@ -487,17 +328,7 @@ def set_osm_cookie(
 
 
 def clear_osm_cookie(response: HttpResponse) -> None:
-    """Clear OSM connection cookie from response.
-
-    Usage:
-        def disconnect_osm(request):
-            response = HttpResponse("OSM disconnected")
-            clear_osm_cookie(response)
-            return response
-
-    Args:
-        response: Django response
-    """
+    """Clear OSM connection cookie from response."""
     config = get_auth_config()
 
     logger.debug(
@@ -523,14 +354,6 @@ def clear_osm_cookie(response: HttpResponse) -> None:
 # ===================================================================
 # User Mapping Helpers (Django version)
 # ===================================================================
-# These helpers allow apps with existing user systems to map Hanko
-# user IDs to their existing user IDs.
-#
-# Example: fAIr uses osm_id as user identifier. When migrating to Hanko,
-# we create a mapping table that links hanko_user_id → osm_id.
-#
-# This is the Django-compatible version of the FastAPI get_mapped_user_id().
-# ===================================================================
 
 
 def get_mapped_user_id(
@@ -547,34 +370,6 @@ def get_mapped_user_id(
     Unlike the FastAPI version, this does NOT auto-create users or mappings.
     It only looks up existing mappings. The app is responsible for creating
     users and mappings through its own flow (e.g., after OSM connect).
-
-    Usage:
-        from hotosm_auth.integrations.django import get_mapped_user_id
-
-        def my_view(request):
-            hanko_user = request.hotosm.user
-            if not hanko_user:
-                return JsonResponse({"error": "Not authenticated"}, status=401)
-
-            # Look up mapping
-            osm_id = get_mapped_user_id(hanko_user, app_name="fair")
-
-            if osm_id is None:
-                # No mapping - user needs to complete onboarding
-                return JsonResponse({"needs_onboarding": True})
-
-            # Has mapping - get the user
-            user = OsmUser.objects.get(osm_id=osm_id)
-            return JsonResponse({"user": user.username})
-
-    Args:
-        hanko_user: Authenticated Hanko user
-        app_name: Application identifier (e.g., "fair", "drone-tm")
-        auto_create: If True and no mapping exists, create one using user_id_generator
-        user_id_generator: Function to generate new user ID (required if auto_create=True)
-
-    Returns:
-        str: Application-specific user ID, or None if no mapping exists
     """
     from django.db import connection
 
@@ -591,7 +386,7 @@ def get_mapped_user_id(
 
         if row:
             app_user_id = row[0]
-            logger.debug(f"Found mapping: {hanko_user.id} → {app_user_id} ({app_name})")
+            logger.debug(f"Found mapping: {hanko_user.id} -> {app_user_id} ({app_name})")
             log_auth_event(
                 "MAPPING_FOUND",
                 app_name,
@@ -620,7 +415,7 @@ def get_mapped_user_id(
             [hanko_user.id, str(new_user_id), app_name],
         )
 
-        logger.info(f"Created mapping: {hanko_user.id} → {new_user_id} ({app_name})")
+        logger.info(f"Created mapping: {hanko_user.id} -> {new_user_id} ({app_name})")
         log_auth_event(
             "MAPPING_CREATED",
             app_name,
@@ -641,20 +436,6 @@ def get_auth_status(request: HttpRequest, app_name: str = "default") -> dict:
     - needs_onboarding: True if logged in but no mapping
     - user: User info if has_mapping
     - hanko_user: Hanko user info if logged_in
-
-    Usage:
-        from hotosm_auth.integrations.django import get_auth_status
-
-        def auth_status_view(request):
-            status = get_auth_status(request, app_name="fair")
-            return JsonResponse(status)
-
-    Args:
-        request: Django request with hotosm middleware
-        app_name: Application identifier for mapping lookup
-
-    Returns:
-        dict: Authentication status
     """
     # Check if hotosm middleware is present
     if not hasattr(request, 'hotosm'):
@@ -710,30 +491,6 @@ def create_user_mapping(
 
     Useful when user completes onboarding (e.g., after OSM connect or
     choosing to skip OSM).
-
-    Usage:
-        from hotosm_auth.integrations.django import create_user_mapping
-
-        def complete_onboarding(request):
-            hanko_user = request.hotosm.user
-            osm_id = request.POST.get("osm_id")  # From OSM connect or generated
-
-            # Create the mapping
-            create_user_mapping(
-                hanko_user_id=hanko_user.id,
-                app_user_id=str(osm_id),
-                app_name="fair",
-            )
-
-            return JsonResponse({"success": True})
-
-    Args:
-        hanko_user_id: Hanko user UUID
-        app_user_id: Application-specific user ID (e.g., osm_id as string)
-        app_name: Application identifier
-
-    Raises:
-        IntegrityError: If mapping already exists
     """
     from django.db import connection
 
@@ -746,7 +503,7 @@ def create_user_mapping(
             [hanko_user_id, app_user_id, app_name],
         )
 
-    logger.info(f"Created mapping: {hanko_user_id} → {app_user_id} ({app_name})")
+    logger.info(f"Created mapping: {hanko_user_id} -> {app_user_id} ({app_name})")
     log_auth_event(
         "MAPPING_CREATED",
         app_name,

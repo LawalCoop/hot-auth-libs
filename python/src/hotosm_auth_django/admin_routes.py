@@ -4,28 +4,24 @@ Django REST Framework views for managing user mappings.
 This module provides admin views for CRUD operations on the
 hanko_user_mappings table, designed for Django applications.
 
-## Usage
+Usage:
+    # In urls.py
+    from django.urls import path, include
+    from hotosm_auth_django import create_admin_urlpatterns
 
-```python
-# In urls.py
-from django.urls import path, include
-from hotosm_auth.integrations.django_admin_routes import create_admin_urlpatterns
-
-urlpatterns = [
-    # ... other urls
-    path("api/admin/", include(create_admin_urlpatterns(
-        app_name="fair",
-        user_model="login.OsmUser",
-        user_id_column="osm_id",
-        user_name_column="username",
-        user_email_column="email",
-    ))),
-]
-```
+    urlpatterns = [
+        # ... other urls
+        path("api/admin/", include(create_admin_urlpatterns(
+            app_name="fair",
+            user_model="login.OsmUser",
+            user_id_column="osm_id",
+            user_name_column="username",
+            user_email_column="email",
+        ))),
+    ]
 """
 
 import os
-from datetime import datetime
 from typing import Any
 
 from django.conf import settings

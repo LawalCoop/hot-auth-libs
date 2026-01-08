@@ -1,10 +1,9 @@
 """
-FastAPI Integration - Ultra-Simplified API
+Simplified setup API for FastAPI authentication.
 
-Single import, single setup function, single dependency.
-
-Example usage:
-    from hotosm_auth.fastapi import setup_auth, Auth
+Usage:
+    from fastapi import FastAPI
+    from hotosm_auth_fastapi import setup_auth, Auth
 
     app = FastAPI()
     setup_auth(app)  # That's it!
@@ -15,18 +14,17 @@ Example usage:
 """
 
 from typing import Optional, Annotated
-from fastapi import FastAPI, Depends, HTTPException, Request, status
+from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 
 from hotosm_auth.config import AuthConfig
 from hotosm_auth.models import HankoUser, OSMConnection
 from hotosm_auth.logger import get_logger
-from hotosm_auth.integrations.fastapi import (
+from hotosm_auth_fastapi.dependencies import (
     init_auth as _init_auth,
     get_current_user,
     get_current_user_optional,
     get_osm_connection,
-    get_config as _get_config,
 )
 
 logger = get_logger(__name__)
@@ -107,20 +105,7 @@ def setup_auth(
         app: FastAPI application instance
         config: Optional AuthConfig. If None, loads from environment variables.
         auto_osm_routes: If True, automatically register OSM OAuth routes. Default: True.
-        cors_origins: List of CORS origins. If None, uses ["http://localhost:3000", "http://localhost:3001", "http://localhost:3002", "http://localhost:4000"]
-
-    Environment variables (if config not provided):
-        HANKO_API_URL: Hanko API URL (required)
-        COOKIE_SECRET: Secret for encrypting cookies (required, min 32 bytes)
-        COOKIE_DOMAIN: Cookie domain (optional, e.g., ".hotosm.org")
-        COOKIE_SECURE: Use secure cookies (default: True)
-        OSM_CLIENT_ID: OSM OAuth client ID (optional)
-        OSM_CLIENT_SECRET: OSM OAuth client secret (optional)
-        OSM_REDIRECT_URI: OSM OAuth redirect URI (optional)
-        OSM_API_URL: OSM API URL (default: https://www.openstreetmap.org)
-
-    Raises:
-        ValueError: If required environment variables are missing
+        cors_origins: List of CORS origins. If None, uses localhost defaults.
     """
     # Load config from environment if not provided
     if config is None:
@@ -150,20 +135,8 @@ def setup_auth(
 
     # Register OSM OAuth routes if enabled
     if auto_osm_routes and config.osm_enabled:
-        from hotosm_auth.integrations.fastapi_osm_routes import router as osm_router
+        from hotosm_auth_fastapi.osm_routes import router as osm_router
         app.include_router(osm_router)
         logger.info("OSM OAuth routes registered at /auth/osm/*")
 
     logger.info(f"HOTOSM Auth initialized (Hanko: {config.hanko_api_url})")
-
-
-# Export commonly used items for convenience
-__all__ = [
-    "setup_auth",
-    "Auth",
-    "OptionalAuth",
-    # Re-export from integrations for advanced users
-    "get_current_user",
-    "get_current_user_optional",
-    "get_osm_connection",
-]

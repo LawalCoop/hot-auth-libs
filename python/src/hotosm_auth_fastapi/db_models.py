@@ -26,9 +26,6 @@ For example:
         )
 """
 
-from datetime import datetime
-from typing import Optional
-
 from sqlalchemy import Column, DateTime, Index, String, UniqueConstraint
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.sql import func
@@ -44,8 +41,8 @@ class HankoUserMapping(Base):
     existing user IDs while using Hanko for authentication.
 
     Example usage:
-        1. User logs in with Hanko → gets hanko_user_id (UUID)
-        2. Look up mapping: hanko_user_id → app_user_id
+        1. User logs in with Hanko -> gets hanko_user_id (UUID)
+        2. Look up mapping: hanko_user_id -> app_user_id
         3. Use app_user_id for all application logic
 
     This way foreign keys remain unchanged and data migrations are minimal.

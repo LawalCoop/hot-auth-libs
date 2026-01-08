@@ -1,106 +1,14 @@
 """
-FastAPI integration for hotosm-auth.
+FastAPI dependencies for HOTOSM authentication.
 
 Provides:
 - Dependency injection for HankoUser and OSMConnection
-- Route decorators for protecting endpoints
-- Response utilities for setting cookies
-
-## Quick Start
-
-1. Create a `.env` file with minimal configuration:
-
-```bash
-# Required
-HANKO_API_URL=https://login.hotosm.org
-COOKIE_SECRET=your-secret-key-min-32-bytes-long
-
-# Optional - for OSM integration
-OSM_CLIENT_ID=your-osm-client-id
-OSM_CLIENT_SECRET=your-osm-client-secret
-
-# ✨ Everything else is auto-detected!
-# - COOKIE_DOMAIN: from HANKO_API_URL → ".hotosm.org"
-# - COOKIE_SECURE: from HANKO_API_URL scheme → true (https)
-# - OSM_REDIRECT_URI: auto-generated → "{HANKO_API_URL}/auth/osm/callback"
-```
-
-2. Initialize auth in your FastAPI app:
-
-```python
-from fastapi import FastAPI
-from hotosm_auth import AuthConfig
-from hotosm_auth.integrations.fastapi import init_auth
-
-app = FastAPI()
-
-# Auto-load from .env
-config = AuthConfig.from_env()
-init_auth(config)
-```
-
-3. Use dependency injection to protect routes:
-
-```python
-from hotosm_auth.integrations.fastapi import CurrentUser, OSMConnectionOptional
-
-@app.get("/protected")
-async def protected_route(
-    user: CurrentUser,
-    osm: OSMConnectionOptional,
-):
-    return {
-        "user": user.email,
-        "osm": osm.osm_username if osm else None,
-    }
-```
-
-## Dependencies Available
-
-- `CurrentUser` - Requires authentication, returns HankoUser
-- `CurrentUserOptional` - Optional authentication, returns Optional[HankoUser]
-- `OSMConnectionDep` - Optional OSM connection, returns Optional[OSMConnection]
-- `OSMConnectionRequired` - Requires OSM connection, returns OSMConnection
-
-## Example: Public Route (Optional Auth)
-
-```python
-from hotosm_auth.integrations.fastapi import CurrentUserOptional
-
-@app.get("/public")
-async def public_route(user: CurrentUserOptional):
-    if user:
-        return {"message": f"Hello {user.email}"}
-    return {"message": "Hello anonymous"}
-```
-
-## Example: OSM Required Route
-
-```python
-from hotosm_auth.integrations.fastapi import CurrentUser, OSMConnectionRequired
-
-@app.get("/osm-only")
-async def osm_route(
-    user: CurrentUser,
-    osm: OSMConnectionRequired,
-):
-    return {"osm_username": osm.osm_username}
-```
-
-## Logging
-
-Control log verbosity with the LOG_LEVEL environment variable:
-
-```bash
-LOG_LEVEL=DEBUG   # Show all debug messages
-LOG_LEVEL=INFO    # Show info and above
-LOG_LEVEL=WARNING # Show warnings and errors only (default)
-LOG_LEVEL=ERROR   # Show errors only
-```
+- Cookie management utilities
+- User mapping helpers
 """
 
 from typing import Optional, Annotated
-from datetime import datetime, timedelta
+from datetime import datetime
 
 from fastapi import Depends, HTTPException, Request, Response, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -134,8 +42,11 @@ def init_auth(config: AuthConfig) -> None:
 
     Call this once at app startup:
 
+        from hotosm_auth_fastapi import init_auth
+        from hotosm_auth import AuthConfig
+
         app = FastAPI()
-        config = AuthConfig(...)
+        config = AuthConfig.from_env()
         init_auth(config)
 
     Args:
@@ -178,13 +89,6 @@ async def get_token_from_request(
     Priority:
     1. Authorization header (Bearer token)
     2. hanko cookie
-
-    Args:
-        request: FastAPI request
-        credentials: Bearer token from Authorization header
-
-    Returns:
-        str: JWT token or None
     """
     # Try Authorization header first
     if credentials and credentials.scheme.lower() == "bearer":
@@ -207,19 +111,8 @@ async def get_current_user(
 
     Usage:
         @app.get("/protected")
-        async def protected_route(user: HankoUser = Depends(get_current_user)):
+        async def protected_route(user: CurrentUser):
             return {"user_id": user.id, "email": user.email}
-
-    Args:
-        request: FastAPI request
-        validator: JWT validator
-        credentials: Bearer token
-
-    Returns:
-        HankoUser: Authenticated user
-
-    Raises:
-        HTTPException: 401 if authentication fails
     """
     token = await get_token_from_request(request, credentials)
 
@@ -255,21 +148,6 @@ async def get_current_user_optional(
     """Get current user if authenticated, None otherwise.
 
     Like get_current_user but doesn't raise exception if not authenticated.
-
-    Usage:
-        @app.get("/optional-auth")
-        async def route(user: Optional[HankoUser] = Depends(get_current_user_optional)):
-            if user:
-                return {"message": f"Hello {user.email}"}
-            return {"message": "Hello anonymous"}
-
-    Args:
-        request: FastAPI request
-        validator: JWT validator
-        credentials: Bearer token
-
-    Returns:
-        HankoUser or None
     """
     token = await get_token_from_request(request, credentials)
 
@@ -290,21 +168,6 @@ async def get_osm_connection(
     """Get OSM connection from encrypted cookie (dependency).
 
     Returns None if no OSM connection cookie found or decryption fails.
-
-    Usage:
-        @app.get("/osm-protected")
-        async def route(
-            user: HankoUser = Depends(get_current_user),
-            osm: OSMConnection = Depends(require_osm_connection),
-        ):
-            return {"osm_username": osm.osm_username}
-
-    Args:
-        request: FastAPI request
-        crypto: Cookie crypto
-
-    Returns:
-        OSMConnection or None
     """
     encrypted = request.cookies.get("osm_connection")
 
@@ -333,20 +196,6 @@ async def require_osm_connection(
     """Require OSM connection (dependency).
 
     Like get_osm_connection but raises HTTPException if not connected.
-
-    Usage:
-        @app.get("/osm-required")
-        async def route(osm: OSMConnection = Depends(require_osm_connection)):
-            return {"osm_username": osm.osm_username}
-
-    Args:
-        osm: OSM connection from cookie
-
-    Returns:
-        OSMConnection
-
-    Raises:
-        HTTPException: 403 if OSM not connected
     """
     if not osm:
         raise HTTPException(
@@ -362,26 +211,7 @@ def set_osm_cookie(
     config: AuthConfig,
     crypto: CookieCrypto,
 ) -> None:
-    """Set encrypted OSM connection cookie on response.
-
-    Usage:
-        @app.get("/auth/osm/callback")
-        async def osm_callback(
-            response: Response,
-            config: AuthConfig = Depends(get_config),
-            crypto: CookieCrypto = Depends(get_cookie_crypto),
-        ):
-            # ... OSM OAuth flow ...
-            osm_conn = OSMConnection(...)
-            set_osm_cookie(response, osm_conn, config, crypto)
-            return {"success": True}
-
-    Args:
-        response: FastAPI response
-        osm_connection: OSM connection data to encrypt
-        config: Auth configuration
-        crypto: Cookie crypto
-    """
+    """Set encrypted OSM connection cookie on response."""
     encrypted = crypto.encrypt_osm_connection(osm_connection)
 
     # Calculate max_age from expires_at
@@ -415,23 +245,7 @@ def clear_osm_cookie(
 
     Tries multiple combinations of cookie attributes to ensure deletion
     regardless of how the cookie was originally set.
-
-    Usage:
-        @app.post("/auth/osm/disconnect")
-        async def disconnect_osm(
-            response: Response,
-            config: AuthConfig = Depends(get_config),
-        ):
-            clear_osm_cookie(response, config)
-            return {"success": True}
-
-    Args:
-        response: FastAPI response
-        config: Auth configuration
     """
-    # Try all combinations to ensure we delete the cookie regardless of how it was set
-    # Browsers require exact attribute match to delete a cookie
-
     for secure in [True, False]:
         for samesite in ["lax", "strict", "none"]:
             # With domain
@@ -469,15 +283,6 @@ OSMConnectionRequired = Annotated[OSMConnection, Depends(require_osm_connection)
 # ===================================================================
 # User Mapping Helpers
 # ===================================================================
-# These helpers allow apps with existing user systems to map Hanko
-# user IDs to their existing user IDs.
-#
-# Example: Drone-TM has users with String IDs. When migrating to Hanko,
-# we don't want to change all foreign keys. Instead, we create a mapping
-# table that links hanko_user_id → drone_tm_user_id.
-#
-# See hotosm_auth.db_models.HankoUserMapping for the reference model.
-# ===================================================================
 
 
 async def get_mapped_user_id(
@@ -494,53 +299,6 @@ async def get_mapped_user_id(
     This function looks up the mapping table to find the app-specific user ID
     corresponding to a Hanko user. If no mapping exists and auto_create=True,
     it attempts to link with existing users via email or creates a new user.
-
-    Usage (with email-based linking):
-        from hotosm_auth.integrations.fastapi import get_mapped_user_id, CurrentUser
-        from app.database import get_db
-
-        # Define lookup and creation functions
-        async def lookup_by_email(conn, email: str) -> Optional[str]:
-            user = await MyUser.get_by_email(conn, email)
-            return user.id if user else None
-
-        async def create_new_user(conn, hanko_user: HankoUser) -> str:
-            new_user = await MyUser.create(conn, email=hanko_user.email)
-            return new_user.id
-
-        @app.get("/me")
-        async def get_me(
-            hanko_user: CurrentUser,
-            db: Connection = Depends(get_db),
-        ):
-            # Get or create app user ID, linking by email if user exists
-            user_id = await get_mapped_user_id(
-                hanko_user=hanko_user,
-                db_conn=db,
-                app_name="drone-tm",
-                auto_create=True,
-                email_lookup_fn=lookup_by_email,
-                user_creator_fn=create_new_user,
-            )
-            return {"user_id": user_id}
-
-    Args:
-        hanko_user: Authenticated Hanko user
-        db_conn: psycopg Connection or AsyncConnection
-        app_name: Application identifier (useful for multi-app deployments)
-        auto_create: If True, create mapping if it doesn't exist
-        email_lookup_fn: Optional async function (conn, email) -> Optional[user_id]
-                        to search for existing users by email
-        user_creator_fn: Optional async function (conn, hanko_user) -> user_id
-                        to create new users in the app
-        user_id_generator: Optional function to generate new user IDs (fallback)
-                          If None and no creator_fn, uses hanko_user.id
-
-    Returns:
-        str: Application-specific user ID
-
-    Raises:
-        HTTPException: 403 if mapping doesn't exist and auto_create=False
     """
     # Look up existing mapping
     async with db_conn.cursor() as cur:
@@ -556,7 +314,7 @@ async def get_mapped_user_id(
 
         if row:
             app_user_id = row[0]
-            logger.debug(f"Found mapping: {hanko_user.id} → {app_user_id}")
+            logger.debug(f"Found mapping: {hanko_user.id} -> {app_user_id}")
             log_auth_event(
                 "MAPPING_FOUND",
                 app_name,
@@ -580,7 +338,7 @@ async def get_mapped_user_id(
             logger.debug(f"Searching for existing user with email: {hanko_user.email}")
             existing_user_id = await email_lookup_fn(db_conn, hanko_user.email)
             if existing_user_id:
-                logger.info(f"Found existing user by email: {hanko_user.email} → {existing_user_id}")
+                logger.info(f"Found existing user by email: {hanko_user.email} -> {existing_user_id}")
                 new_user_id = existing_user_id
 
         # If no existing user, try to create new user
@@ -606,7 +364,7 @@ async def get_mapped_user_id(
             (hanko_user.id, new_user_id, app_name),
         )
 
-        logger.info(f"Created mapping: {hanko_user.id} → {new_user_id} ({app_name})")
+        logger.info(f"Created mapping: {hanko_user.id} -> {new_user_id} ({app_name})")
         log_auth_event(
             "MAPPING_CREATED",
             app_name,
@@ -626,30 +384,6 @@ async def create_user_mapping(
     """Manually create a user mapping.
 
     Useful for data migration when adding Hanko to an existing app.
-
-    Usage:
-        # Migration script
-        from hotosm_auth.integrations.fastapi import create_user_mapping
-
-        # For each existing user:
-        for user in existing_users:
-            # If user already has Hanko account:
-            if user.hanko_id:
-                await create_user_mapping(
-                    hanko_user_id=user.hanko_id,
-                    app_user_id=user.id,
-                    db_conn=db,
-                    app_name="drone-tm",
-                )
-
-    Args:
-        hanko_user_id: Hanko user UUID
-        app_user_id: Application-specific user ID
-        db_conn: psycopg Connection or AsyncConnection
-        app_name: Application identifier
-
-    Raises:
-        Exception: If mapping already exists or database error
     """
     async with db_conn.cursor() as cur:
         await cur.execute(
@@ -660,7 +394,7 @@ async def create_user_mapping(
             (hanko_user_id, app_user_id, app_name),
         )
 
-    logger.info(f"Manually created mapping: {hanko_user_id} → {app_user_id} ({app_name})")
+    logger.info(f"Manually created mapping: {hanko_user_id} -> {app_user_id} ({app_name})")
     log_auth_event(
         "MAPPING_CREATED",
         app_name,

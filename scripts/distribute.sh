@@ -62,6 +62,15 @@ update_pyproject() {
     fi
 }
 
+update_docker_compose() {
+    local file="$1"
+    if [ -f "$file" ]; then
+        # Replace any hotosm_auth-X.X.X-py3-none-any.whl with the current version
+        sed -i "s|hotosm_auth-[0-9.]*-py3-none-any.whl|hotosm_auth-$VERSION-py3-none-any.whl|g" "$file"
+        echo "  ✅ Updated: $file"
+    fi
+}
+
 # =============================================================================
 # Distribute to projects
 # =============================================================================
@@ -104,6 +113,18 @@ update_pyproject "$HOT_DIR/openaerialmap/backend/stac-api/pyproject.toml"
 echo ""
 echo "✅ All pyproject.toml references updated to v$VERSION"
 echo ""
+
+# =============================================================================
+# Update hot-dev-env docker-compose.yml
+# =============================================================================
+
+echo "🐳 Updating hot-dev-env docker-compose.yml to v$VERSION..."
+
+update_docker_compose "$HOT_DIR/hot-dev-env/docker-compose.yml"
+
+echo ""
+echo "✅ hot-dev-env docker-compose.yml updated to v$VERSION"
+echo ""
 echo "Don't forget to commit changes in each project!"
 echo ""
 echo "Projects updated:"
@@ -122,3 +143,4 @@ echo "  - openaerialmap/backend/stac-api/pyproject.toml → v$VERSION"
 echo "  - fAIr/frontend/auth-libs/web-component/dist/"
 echo "  - fAIr/backend/auth-libs/dist/"
 echo "  - fAIr/backend/pyproject.toml → v$VERSION"
+echo "  - hot-dev-env/docker-compose.yml → v$VERSION"
