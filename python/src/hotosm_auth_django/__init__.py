@@ -58,24 +58,12 @@ from hotosm_auth_django.middleware import (
     create_user_mapping,
 )
 
-# Admin routes
-from hotosm_auth_django.admin_routes import (
-    create_admin_urlpatterns,
-    get_admin_emails,
-    is_admin_user,
-)
-
-# OSM OAuth views
-from hotosm_auth_django.osm_views import (
-    osm_login,
-    osm_callback,
-    osm_status,
-    osm_disconnect,
-    urlpatterns as osm_urlpatterns,
-)
-
-# Django ORM models
-from hotosm_auth_django.models import HankoUserMapping
+# NOTE: admin_routes, osm_views, and models require Django apps to be ready.
+# Import them directly from their modules:
+#
+#   from hotosm_auth_django.admin_routes import create_admin_urlpatterns
+#   from hotosm_auth_django.osm_views import osm_login, osm_callback
+#   from hotosm_auth_django.models import HankoUserMapping
 
 __all__ = [
     # Middleware
@@ -97,16 +85,4 @@ __all__ = [
     "get_mapped_user_id",
     "get_auth_status",
     "create_user_mapping",
-    # Admin
-    "create_admin_urlpatterns",
-    "get_admin_emails",
-    "is_admin_user",
-    # OSM views
-    "osm_login",
-    "osm_callback",
-    "osm_status",
-    "osm_disconnect",
-    "osm_urlpatterns",
-    # Models
-    "HankoUserMapping",
 ]
