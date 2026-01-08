@@ -9,6 +9,11 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 AUTH_LIBS_DIR="$(dirname "$SCRIPT_DIR")"
 HOT_DIR="$(dirname "$AUTH_LIBS_DIR")"
 
+# Get current version from pyproject.toml
+VERSION=$(grep '^version = ' "$AUTH_LIBS_DIR/python/pyproject.toml" | sed 's/version = "\(.*\)"/\1/')
+echo "📌 Current auth-libs version: v$VERSION"
+echo ""
+
 # Distribute web component
 echo "📦 Distributing web-component (source + dist) to portal..."
 mkdir -p "$HOT_DIR/portal/frontend/auth-libs/web-component"
@@ -114,16 +119,43 @@ echo ""
 
 echo "✅ Distribution complete!"
 echo ""
-echo "Don't forget to commit the dist/ folders in each project!"
+
+# Update pyproject.toml references in all projects
+echo "📝 Updating pyproject.toml references to v$VERSION..."
+
+update_pyproject() {
+    local file="$1"
+    if [ -f "$file" ]; then
+        # Replace any @vX.X.X or @main with the current version
+        sed -i "s|hot-auth-libs.git@[^#]*#|hot-auth-libs.git@v$VERSION#|g" "$file"
+        echo "  ✅ Updated: $file"
+    fi
+}
+
+update_pyproject "$HOT_DIR/portal/backend/pyproject.toml"
+update_pyproject "$HOT_DIR/drone-tm/src/backend/pyproject.toml"
+update_pyproject "$HOT_DIR/login/backend/pyproject.toml"
+update_pyproject "$HOT_DIR/fAIr/backend/pyproject.toml"
+update_pyproject "$HOT_DIR/openaerialmap/backend/stac-api/pyproject.toml"
+
+echo ""
+echo "✅ All pyproject.toml references updated to v$VERSION"
+echo ""
+echo "Don't forget to commit changes in each project!"
 echo ""
 echo "Projects updated:"
 echo "  - portal/frontend/auth-libs/web-component/dist/"
 echo "  - portal/backend/auth-libs/python/dist/"
+echo "  - portal/backend/pyproject.toml → v$VERSION"
 echo "  - drone-tm/src/frontend/auth-libs/web-component/dist/"
 echo "  - drone-tm/src/backend/auth-libs/dist/"
+echo "  - drone-tm/src/backend/pyproject.toml → v$VERSION"
 echo "  - login/backend/auth-libs/python/dist/"
 echo "  - login/frontend/auth-libs/web-component/dist/"
+echo "  - login/backend/pyproject.toml → v$VERSION"
 echo "  - openaerialmap/frontend/auth-libs/web-component/dist/"
 echo "  - openaerialmap/backend/stac-api/auth-libs/dist/"
+echo "  - openaerialmap/backend/stac-api/pyproject.toml → v$VERSION"
 echo "  - fAIr/frontend/auth-libs/web-component/dist/"
 echo "  - fAIr/backend/auth-libs/dist/"
+echo "  - fAIr/backend/pyproject.toml → v$VERSION"

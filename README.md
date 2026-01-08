@@ -11,7 +11,7 @@ Librerías de autenticación compartidas para todos los proyectos HOTOSM.
 **Instalación** (en tu `pyproject.toml`):
 ```python
 dependencies = [
-    "hotosm-auth @ git+https://github.com/LawalCoop/hot-auth-libs.git@v0.1.8#subdirectory=python",
+    "hotosm-auth @ git+https://github.com/LawalCoop/hot-auth-libs.git@v0.1.11#subdirectory=python",
 ]
 ```
 
@@ -57,7 +57,7 @@ Auth-libs usa dos métodos de distribución diferentes:
 
 Los proyectos referencian auth-libs directamente desde GitHub:
 ```python
-"hotosm-auth @ git+https://github.com/LawalCoop/hot-auth-libs.git@v0.1.8#subdirectory=python",
+"hotosm-auth @ git+https://github.com/LawalCoop/hot-auth-libs.git@v0.1.11#subdirectory=python",
 ```
 
 - No hay wheels que distribuir ni commitear
@@ -93,12 +93,17 @@ Editar `python/pyproject.toml`:
 version = "0.1.9"  # bump de 0.1.8
 ```
 
-### 3. Build y distribute web component
+### 3. Build y distribute
 
 ```bash
-./scripts/build.sh
-./scripts/distribute.sh
+./scripts/build.sh      # Compila Python wheel + JS bundles
+./scripts/distribute.sh # Copia dist/ a proyectos Y actualiza pyproject.toml
 ```
+
+El script `distribute.sh` automáticamente:
+- Copia web component dist/ a todos los frontends
+- Copia Python dist/ a todos los backends
+- **Actualiza las referencias en `pyproject.toml` de todos los proyectos** a la versión actual
 
 ### 4. Commit y tag
 
@@ -110,32 +115,12 @@ git tag v0.1.9
 git push --tags
 ```
 
-### 5. Actualizar proyectos
+### 5. Commitear en todos los proyectos
 
-**Para Python (backend)**:
-
-Cambiar el tag en `pyproject.toml` de cada proyecto:
-```python
-# Cambiar @v0.1.8 a @v0.1.9
-"hotosm-auth @ git+https://github.com/LawalCoop/hot-auth-libs.git@v0.1.9#subdirectory=python",
-```
-
-Regenerar lockfile:
+En cada proyecto, commitear los cambios generados por `distribute.sh`:
 ```bash
-uv lock
-```
-
-**Para Web Component (frontend)**:
-
-Ya distribuido en paso 3. Solo commitear los archivos:
-```bash
-git add frontend/auth-libs/
+git add frontend/auth-libs/ backend/pyproject.toml
 git commit -m "Update auth-libs to v0.1.9"
-```
-
-### 6. Push en todos los proyectos
-
-```bash
 git push
 ```
 
