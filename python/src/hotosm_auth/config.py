@@ -125,11 +125,11 @@ class AuthConfig(BaseModel):
             # Strip trailing slash from HttpUrl (Pydantic adds it automatically)
             issuer_url = str(self.hanko_api_url).rstrip('/')
             object.__setattr__(self, 'jwt_issuer', issuer_url)
-            print(f"✓ JWT issuer set to: {issuer_url} (from hanko_api_url)")
+            logger.info(f"JWT issuer set to: {issuer_url} (from hanko_api_url)")
         elif self.jwt_issuer:
-            print(f"✓ JWT issuer explicitly set to: {self.jwt_issuer}")
+            logger.info(f"JWT issuer explicitly set to: {self.jwt_issuer}")
         else:
-            print("⚠️  JWT issuer validation is DISABLED (jwt_issuer=None)")
+            logger.warning("JWT issuer validation is DISABLED (jwt_issuer=None)")
         # If None, issuer validation is skipped
 
     @classmethod

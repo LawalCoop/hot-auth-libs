@@ -14,114 +14,44 @@ VERSION=$(grep '^version = ' "$AUTH_LIBS_DIR/python/pyproject.toml" | sed 's/ver
 echo "📌 Current auth-libs version: v$VERSION"
 echo ""
 
-# Distribute web component
-echo "📦 Distributing web-component (source + dist) to portal..."
-mkdir -p "$HOT_DIR/portal/frontend/auth-libs/web-component"
-rm -rf "$HOT_DIR/portal/frontend/auth-libs/web-component/dist"
-rm -rf "$HOT_DIR/portal/frontend/auth-libs/web-component/src"
-cp -r "$AUTH_LIBS_DIR/web-component/dist" "$HOT_DIR/portal/frontend/auth-libs/web-component/"
-cp -r "$AUTH_LIBS_DIR/web-component/src" "$HOT_DIR/portal/frontend/auth-libs/web-component/"
-cp "$AUTH_LIBS_DIR/web-component/package.json" "$HOT_DIR/portal/frontend/auth-libs/web-component/"
-cp "$AUTH_LIBS_DIR/web-component/vite.config.js" "$HOT_DIR/portal/frontend/auth-libs/web-component/"
-echo "✅ Web component (source + dist) → portal"
-echo ""
+# =============================================================================
+# Helper functions
+# =============================================================================
 
-# Distribute Python package to portal
-echo "📦 Distributing Python dist/ to portal..."
-mkdir -p "$HOT_DIR/portal/backend/auth-libs/python"
-rm -rf "$HOT_DIR/portal/backend/auth-libs/python/dist"
-cp -r "$AUTH_LIBS_DIR/python/dist" "$HOT_DIR/portal/backend/auth-libs/python/"
-echo "✅ Python package → portal"
-echo ""
+distribute_web_component() {
+    local target_dir="$1"
+    local project_name="$2"
 
-# Distribute web component to drone-tm
-echo "📦 Distributing web-component (source + dist) to drone-tm..."
-mkdir -p "$HOT_DIR/drone-tm/src/frontend/auth-libs/web-component"
-rm -rf "$HOT_DIR/drone-tm/src/frontend/auth-libs/web-component/dist"
-rm -rf "$HOT_DIR/drone-tm/src/frontend/auth-libs/web-component/src"
-cp -r "$AUTH_LIBS_DIR/web-component/dist" "$HOT_DIR/drone-tm/src/frontend/auth-libs/web-component/"
-cp -r "$AUTH_LIBS_DIR/web-component/src" "$HOT_DIR/drone-tm/src/frontend/auth-libs/web-component/"
-cp "$AUTH_LIBS_DIR/web-component/package.json" "$HOT_DIR/drone-tm/src/frontend/auth-libs/web-component/"
-cp "$AUTH_LIBS_DIR/web-component/vite.config.js" "$HOT_DIR/drone-tm/src/frontend/auth-libs/web-component/"
-echo "✅ Web component (source + dist) → drone-tm"
-echo ""
+    echo "📦 Distributing web-component (source + dist) to $project_name..."
+    mkdir -p "$target_dir"
+    rm -rf "$target_dir/dist" "$target_dir/src"
+    cp -r "$AUTH_LIBS_DIR/web-component/dist" "$target_dir/"
+    cp -r "$AUTH_LIBS_DIR/web-component/src" "$target_dir/"
+    cp "$AUTH_LIBS_DIR/web-component/package.json" "$target_dir/"
+    cp "$AUTH_LIBS_DIR/web-component/vite.config.js" "$target_dir/"
+    echo "✅ Web component (source + dist) → $project_name"
+    echo ""
+}
 
-# Distribute Python package to drone-tm
-echo "📦 Distributing Python dist/ to drone-tm..."
-mkdir -p "$HOT_DIR/drone-tm/src/backend/auth-libs"
-rm -rf "$HOT_DIR/drone-tm/src/backend/auth-libs/dist"
-cp -r "$AUTH_LIBS_DIR/python/dist" "$HOT_DIR/drone-tm/src/backend/auth-libs/"
-# Copy wheel to libs/ directory (used by pyproject.toml/uv.lock)
-rm -f "$HOT_DIR/drone-tm/src/backend/libs/"hotosm_auth-*.whl
-cp "$AUTH_LIBS_DIR/python/dist/"*.whl "$HOT_DIR/drone-tm/src/backend/libs/"
-echo "✅ Python package → drone-tm"
-echo ""
+distribute_python() {
+    local target_dir="$1"
+    local project_name="$2"
+    local wheel_dir="${3:-}"  # Optional: directory to copy wheel file
 
-# Distribute Python package to login
-echo "📦 Distributing Python dist/ to login..."
-mkdir -p "$HOT_DIR/login/backend/auth-libs/python"
-rm -rf "$HOT_DIR/login/backend/auth-libs/python/dist"
-cp -r "$AUTH_LIBS_DIR/python/dist" "$HOT_DIR/login/backend/auth-libs/python/"
-echo "✅ Python package → login"
-echo ""
+    echo "📦 Distributing Python dist/ to $project_name..."
+    mkdir -p "$target_dir"
+    rm -rf "$target_dir/dist"
+    cp -r "$AUTH_LIBS_DIR/python/dist" "$target_dir/"
 
-# Distribute web component to login
-echo "📦 Distributing web-component (source + dist) to login..."
-mkdir -p "$HOT_DIR/login/frontend/auth-libs/web-component"
-rm -rf "$HOT_DIR/login/frontend/auth-libs/web-component/dist"
-rm -rf "$HOT_DIR/login/frontend/auth-libs/web-component/src"
-cp -r "$AUTH_LIBS_DIR/web-component/dist" "$HOT_DIR/login/frontend/auth-libs/web-component/"
-cp -r "$AUTH_LIBS_DIR/web-component/src" "$HOT_DIR/login/frontend/auth-libs/web-component/"
-cp "$AUTH_LIBS_DIR/web-component/package.json" "$HOT_DIR/login/frontend/auth-libs/web-component/"
-cp "$AUTH_LIBS_DIR/web-component/vite.config.js" "$HOT_DIR/login/frontend/auth-libs/web-component/"
-echo "✅ Web component (source + dist) → login"
-echo ""
+    # Copy wheel to additional directory if specified
+    if [ -n "$wheel_dir" ] && [ -d "$wheel_dir" ]; then
+        rm -f "$wheel_dir/"hotosm_auth-*.whl
+        cp "$AUTH_LIBS_DIR/python/dist/"*.whl "$wheel_dir/"
+    fi
 
-# Distribute web component to openaerialmap
-echo "📦 Distributing web-component (source + dist) to openaerialmap..."
-mkdir -p "$HOT_DIR/openaerialmap/frontend/auth-libs/web-component"
-rm -rf "$HOT_DIR/openaerialmap/frontend/auth-libs/web-component/dist"
-rm -rf "$HOT_DIR/openaerialmap/frontend/auth-libs/web-component/src"
-cp -r "$AUTH_LIBS_DIR/web-component/dist" "$HOT_DIR/openaerialmap/frontend/auth-libs/web-component/"
-cp -r "$AUTH_LIBS_DIR/web-component/src" "$HOT_DIR/openaerialmap/frontend/auth-libs/web-component/"
-cp "$AUTH_LIBS_DIR/web-component/package.json" "$HOT_DIR/openaerialmap/frontend/auth-libs/web-component/"
-cp "$AUTH_LIBS_DIR/web-component/vite.config.js" "$HOT_DIR/openaerialmap/frontend/auth-libs/web-component/"
-echo "✅ Web component (source + dist) → openaerialmap"
-echo ""
-
-# Distribute Python package to openaerialmap
-echo "📦 Distributing Python dist/ to openaerialmap..."
-mkdir -p "$HOT_DIR/openaerialmap/backend/stac-api/auth-libs"
-rm -rf "$HOT_DIR/openaerialmap/backend/stac-api/auth-libs/dist"
-cp -r "$AUTH_LIBS_DIR/python/dist" "$HOT_DIR/openaerialmap/backend/stac-api/auth-libs/"
-echo "✅ Python package → openaerialmap"
-echo ""
-
-# Distribute web component to fAIr
-echo "📦 Distributing web-component (source + dist) to fAIr..."
-mkdir -p "$HOT_DIR/fAIr/frontend/auth-libs/web-component"
-rm -rf "$HOT_DIR/fAIr/frontend/auth-libs/web-component/dist"
-rm -rf "$HOT_DIR/fAIr/frontend/auth-libs/web-component/src"
-cp -r "$AUTH_LIBS_DIR/web-component/dist" "$HOT_DIR/fAIr/frontend/auth-libs/web-component/"
-cp -r "$AUTH_LIBS_DIR/web-component/src" "$HOT_DIR/fAIr/frontend/auth-libs/web-component/"
-cp "$AUTH_LIBS_DIR/web-component/package.json" "$HOT_DIR/fAIr/frontend/auth-libs/web-component/"
-cp "$AUTH_LIBS_DIR/web-component/vite.config.js" "$HOT_DIR/fAIr/frontend/auth-libs/web-component/"
-echo "✅ Web component (source + dist) → fAIr"
-echo ""
-
-# Distribute Python package to fAIr
-echo "📦 Distributing Python dist/ to fAIr..."
-mkdir -p "$HOT_DIR/fAIr/backend/auth-libs"
-rm -rf "$HOT_DIR/fAIr/backend/auth-libs/dist"
-cp -r "$AUTH_LIBS_DIR/python/dist" "$HOT_DIR/fAIr/backend/auth-libs/"
-echo "✅ Python package → fAIr"
-echo ""
-
-echo "✅ Distribution complete!"
-echo ""
-
-# Update pyproject.toml references in all projects
-echo "📝 Updating pyproject.toml references to v$VERSION..."
+    echo "✅ Python package → $project_name"
+    echo ""
+}
 
 update_pyproject() {
     local file="$1"
@@ -131,6 +61,39 @@ update_pyproject() {
         echo "  ✅ Updated: $file"
     fi
 }
+
+# =============================================================================
+# Distribute to projects
+# =============================================================================
+
+# Portal
+distribute_web_component "$HOT_DIR/portal/frontend/auth-libs/web-component" "portal"
+distribute_python "$HOT_DIR/portal/backend/auth-libs/python" "portal"
+
+# Drone-TM
+distribute_web_component "$HOT_DIR/drone-tm/src/frontend/auth-libs/web-component" "drone-tm"
+distribute_python "$HOT_DIR/drone-tm/src/backend/auth-libs" "drone-tm" "$HOT_DIR/drone-tm/src/backend/libs"
+
+# Login
+distribute_python "$HOT_DIR/login/backend/auth-libs/python" "login"
+distribute_web_component "$HOT_DIR/login/frontend/auth-libs/web-component" "login"
+
+# OpenAerialMap
+distribute_web_component "$HOT_DIR/openaerialmap/frontend/auth-libs/web-component" "openaerialmap"
+distribute_python "$HOT_DIR/openaerialmap/backend/stac-api/auth-libs" "openaerialmap"
+
+# fAIr
+distribute_web_component "$HOT_DIR/fAIr/frontend/auth-libs/web-component" "fAIr"
+distribute_python "$HOT_DIR/fAIr/backend/auth-libs" "fAIr"
+
+echo "✅ Distribution complete!"
+echo ""
+
+# =============================================================================
+# Update pyproject.toml references
+# =============================================================================
+
+echo "📝 Updating pyproject.toml references to v$VERSION..."
 
 update_pyproject "$HOT_DIR/portal/backend/pyproject.toml"
 update_pyproject "$HOT_DIR/drone-tm/src/backend/pyproject.toml"

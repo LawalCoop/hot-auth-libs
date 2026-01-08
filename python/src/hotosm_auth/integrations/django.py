@@ -632,6 +632,75 @@ def get_mapped_user_id(
         return str(new_user_id)
 
 
+def get_auth_status(request: HttpRequest, app_name: str = "default") -> dict:
+    """Get authentication status for current request.
+
+    Returns a dict with:
+    - logged_in: True if user has valid Hanko session
+    - has_mapping: True if user has app mapping (fully authenticated)
+    - needs_onboarding: True if logged in but no mapping
+    - user: User info if has_mapping
+    - hanko_user: Hanko user info if logged_in
+
+    Usage:
+        from hotosm_auth.integrations.django import get_auth_status
+
+        def auth_status_view(request):
+            status = get_auth_status(request, app_name="fair")
+            return JsonResponse(status)
+
+    Args:
+        request: Django request with hotosm middleware
+        app_name: Application identifier for mapping lookup
+
+    Returns:
+        dict: Authentication status
+    """
+    # Check if hotosm middleware is present
+    if not hasattr(request, 'hotosm'):
+        return {
+            "logged_in": False,
+            "has_mapping": False,
+            "error": "HOTOSM middleware not configured",
+        }
+
+    hanko_user = request.hotosm.user
+
+    # No Hanko session
+    if not hanko_user:
+        return {
+            "logged_in": False,
+            "has_mapping": False,
+        }
+
+    # Has Hanko session - check mapping
+    mapped_user_id = get_mapped_user_id(hanko_user, app_name=app_name)
+
+    if mapped_user_id is not None:
+        # Fully authenticated
+        return {
+            "logged_in": True,
+            "has_mapping": True,
+            "needs_onboarding": False,
+            "app_user_id": mapped_user_id,
+            "hanko_user": {
+                "id": hanko_user.id,
+                "email": hanko_user.email,
+            },
+        }
+
+    # Logged in but no mapping
+    return {
+        "logged_in": True,
+        "has_mapping": False,
+        "needs_onboarding": True,
+        "hanko_user": {
+            "id": hanko_user.id,
+            "email": hanko_user.email,
+        },
+    }
+
+
 def create_user_mapping(
     hanko_user_id: str,
     app_user_id: str,

@@ -20,6 +20,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from hotosm_auth.config import AuthConfig
 from hotosm_auth.models import HankoUser, OSMConnection
+from hotosm_auth.logger import get_logger
 from hotosm_auth.integrations.fastapi import (
     init_auth as _init_auth,
     get_current_user,
@@ -27,6 +28,8 @@ from hotosm_auth.integrations.fastapi import (
     get_osm_connection,
     get_config as _get_config,
 )
+
+logger = get_logger(__name__)
 
 
 class _AuthDep:
@@ -149,9 +152,9 @@ def setup_auth(
     if auto_osm_routes and config.osm_enabled:
         from hotosm_auth.integrations.fastapi_osm_routes import router as osm_router
         app.include_router(osm_router)
-        print(f"✅ OSM OAuth routes registered at /auth/osm/*")
+        logger.info("OSM OAuth routes registered at /auth/osm/*")
 
-    print(f"✅ HOTOSM Auth initialized (Hanko: {config.hanko_api_url})")
+    logger.info(f"HOTOSM Auth initialized (Hanko: {config.hanko_api_url})")
 
 
 # Export commonly used items for convenience

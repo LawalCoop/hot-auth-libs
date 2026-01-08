@@ -13,7 +13,7 @@ Key Features:
 - Legacy user mapping for gradual migration
 """
 
-__version__ = "0.1.4"
+__version__ = "0.1.12"
 
 from hotosm_auth.models import HankoUser, OSMConnection, OSMScope
 from hotosm_auth.config import AuthConfig
